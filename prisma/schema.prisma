@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  profile      Profile?
+  agents       Agent[]
+  projects     Project[]
+  conversations Conversation[]
+  files        File[]
+  tasks        Task[]
+  applications Application[]
+  approvals    Approval[]
+  usageEvents  UsageEvent[]
+  subscription Subscription?
+  passwordResetTokens PasswordResetToken[]
+  auditEvents AuditEvent[]
+  memberships WorkspaceMember[]
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution String?
+  degree      String?
+  semester    String?
+  goals       String   @default("[]")
+  subjects    String   @default("[]")
+  skills      String   @default("[]")
+  interests   String   @default("[]")
+  studyHours  Int?
+  careerTarget String?
+  onboardingDone Boolean @default(false)
+  updatedAt   DateTime @updatedAt
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  ownerId     String?
+  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  template    String
+  name        String
+  role        String
+  description String
+  icon        String   @default("sparkles")
+  category    String
+  systemPrompt String
+  createdAt   DateTime @default(now())
+  conversations Conversation[]
+
+  @@unique([ownerId, template])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  title     String    @default("New conversation")
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([agentId])
+  @@index([userId, projectId])
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  description String   @default("")
+  type        String   @default("major")
+  status      String   @default("active")
+  targetDate  DateTime?
+  linkedAgentIds String @default("[]")
+  members        String @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+  conversations Conversation[]
+
+  @@index([ownerId])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title       String
+  dueDate     DateTime?
+  priority    String    @default("medium")
+  status      String    @default("todo")
+  agentId     String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([projectId, status, dueDate])
+}
+
+model File {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  mimeType  String
+  size       Int
+  status    String   @default("ready")
+  textContent String  @default("")
+  createdAt DateTime @default(now())
+
+  @@index([ownerId, status])
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  company   String
+  role      String
+  url       String   @default("")
+  status    String   @default("saved")
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, status])
+}
+
+model Approval {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  agentId     String
+  title       String
+  description String
+  payload     String   @default("{}")
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  decidedAt   DateTime?
+
+  @@index([ownerId, status])
+}
+
+model UsageEvent {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  type      String
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([ownerId, type])
+}
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan               String   @default("free")
+  status             String   @default("active")
+  provider           String?
+  providerCustomerId String?  @unique
+  providerSubId      String?  @unique
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  ownerId   String?
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  action    String
+  metadata  String   @default("{}")
+  createdAt DateTime @default(now())
+  @@index([ownerId, createdAt])
+  @@index([action, createdAt])
+}
+
+model BillingEvent {
+  id String @id @default(cuid())
+  provider String
+  providerEventId String @unique
+  eventType String
+  receivedAt DateTime @default(now())
+}
+
+model Workspace {
+  id String @id @default(cuid())
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members WorkspaceMember[]
+  invitations WorkspaceInvite[]
+}
+
+model WorkspaceMember {
+  id String @id @default(cuid())
+  workspaceId String
+  userId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role String @default("owner")
+  createdAt DateTime @default(now())
+  @@unique([workspaceId, userId])
+  @@index([userId, role])
+}
+
+model WorkspaceInvite {
+  id String @id @default(cuid())
+  workspaceId String
+  email String
+  tokenHash String @unique
+  role String @default("member")
+  expiresAt DateTime
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, email, expiresAt])
+}
