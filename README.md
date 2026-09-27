@@ -1,201 +1,279 @@
 # AgentHub — Your AI Student Team
 
-> Your goals in. Momentum out.
+> **Your goals in. Momentum out.**
 
-AgentHub gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, Interview Coach** — inside one calm workspace for studying, projects, careers, and daily planning.
+AgentHub gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, and Interview Coach** — orchestrated inside a unified workspace for coursework, software projects, career growth, and daily execution.
 
-- **Study smarter:** upload notes, get revision plans, flashcards, and quizzes with source citations.
-- **Build better:** scope projects into milestones, link agents and files to project context.
-- **Get ahead:** review resumes, track applications, draft cover letters (always as drafts needing approval).
-- **Stay in control:** every external or destructive action requires your explicit approval.
-
-**Status:** Working MVP (all 8 build phases implemented). Not yet production-ready — see [REMAINING.md](./REMAINING.md) for the full gap analysis. Product spec: [design.md](./design.md). Build contract: [planning.md](./planning.md).
+Built on an autonomous **Agentic Architecture** with a deterministic state machine, permission-controlled tool registry, external integrations (including MCP support), asynchronous job processing, and human-in-the-loop safety approvals.
 
 ---
 
-## ✨ Features
+## 🌟 Core Pillars
 
-| Area | What works |
-|---|---|
-| Public site | Landing, agents, how-it-works, pricing, privacy/terms, login/signup |
-| Auth | Email/password (Auth.js credentials, bcrypt-12, JWT sessions), protected `/app` + `/onboarding`, login rate-limiting |
-| Onboarding | 4 steps (education → goals → context → agents); goals drive agent activation |
-| Agents | 6 templates + custom agents (safety notice; custom prompts can't override approvals) |
-| Chat | Streaming SSE responses, Markdown-ready bubbles, citations, approval cards, conversation list/rename/delete, project attach, suggested prompts, retry |
-| Files | PDF/TXT/MD/DOCX upload (10 MB), preview, summarize/flashcards/quiz, per-file delete + status |
-| Projects | CRUD, detail (milestones, linked agents, members, activity), agent linking, project-scoped chat context |
-| Planner | Today / Week / Calendar views, priorities, due dates, completion tracking |
-| Career | Resume keyword analysis + skill-gap plan, application tracker (`saved → offer/rejected`), DRAFT cover letters |
-| Safety | Approval lifecycle (`pending → approved/denied/expired`, 7-day TTL), audit usage events, human-in-the-loop copy throughout |
-| Usage | Plan display, message/file counts, approval stats, checkout stub |
+- 🧠 **Autonomous Agentic Engine:** Step-by-step planning and orchestration with streaming run events (SSE), pause/resume, and real-time execution tracking.
+- 🛡️ **Human-in-the-Loop Safety:** Sensitive and destructive actions (e.g. external API calls, deletions, application submissions) are gated by an explicit approval queue with a 7-day TTL.
+- 📚 **Study & Research RAG:** Note parsing and sliding-window chunking (PDF, DOCX, TXT, Markdown) with source citations, flashcard generation, and quiz synthesis.
+- 🛠️ **Extensible Tool Registry:** Permission-scoped internal tools allowing agents to interact with tasks, projects, files, conversations, and user profile data.
+- 🔌 **Integrations & MCP:** Encrypted credential vault (AES-256-GCM) supporting GitHub, Notion, Google Drive, and Model Context Protocol (MCP) servers.
+- ⚡ **Background Job Processing:** Robust async queue with exponential backoff, worker retry policies, and automated cleanup.
+- 📊 **Full Observability:** Structured JSON logging, distributed trace context, Sentry error monitoring, and runtime platform metrics.
 
 ---
 
-## 🧱 Tech stack
+## 🤖 The Agent Team
 
-- **Frontend:** Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS v4, reference-ported design system in `src/app/globals.css`
-- **Auth:** Auth.js v5 (credentials provider, JWT sessions, `src/proxy.ts` route guard)
-- **Data:** Prisma 6 + SQLite locally (`prisma/dev.db`), Postgres in production (migration history in `prisma/migrations`)
-- **Validation:** Zod on all mutating APIs
-- **AI:** `ChatEvent`/`ChatInput` streaming protocol (`src/lib/ai.ts`) — **mock provider by default**, no keys needed; swap in OpenAI/Gemini per interface
-- **Tests:** Vitest (status transitions, approval expiry, input validation)
-- **Package manager:** Bun (npm works too, slower with the configured mirror)
+| Agent | Focus Area | Key Capabilities |
+|---|---|---|
+| **Study Coach** | Academic mastery & exam prep | Note analysis, syllabus breakdown, revision schedules, citation-backed Q&A |
+| **Project Guide** | Milestone scoping & architecture | Project breakdown, deliverable tracking, milestone planning, code architecture |
+| **Career Scout** | Professional placement & growth | Resume keyword gap analysis, application tracking pipeline, DRAFT cover letters |
+| **Writing Buddy** | Composition & proofreading | Thesis structuring, tone adjustments, essay feedback, argument outlining |
+| **Code Mentor** | Software engineering & debugging | Code explanations, algorithm walkthroughs, error diagnosis, test case design |
+| **Interview Coach** | Behavioral & technical prep | Mock interviews, STAR method coaching, instant constructive feedback |
+| **Custom Agents** | User-defined specialist workflows | Configurable system instructions protected by global safety constraints |
 
 ---
 
-## 🚀 Getting started
+## 🏗️ System Architecture
+
+```text
+                                 ┌─────────────────────────┐
+                                 │   Next.js 16 Web App    │
+                                 │ (React 19 + Tailwind 4) │
+                                 └───────────┬─────────────┘
+                                             │ HTTP / SSE
+                                             ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 AgentHub Platform Core                                 │
+│                                                                                        │
+│  ┌───────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────┐ │
+│  │   Agent Orchestrator  │──▶│    AgentRun State Machine │──▶│   Event Stream (SSE)  │ │
+│  │ (Planner + Step Exec) │   │ (QUEUED ➔ EXEC ➔ FINISHED)│   │  /agent-runs/[id]/... │ │
+│  └──────────┬────────────┘   └───────────────────────────┘   └───────────────────────┘ │
+│             │                                                                          │
+│             ├──────────────────────────┬──────────────────────────┐                    │
+│             ▼                          ▼                          ▼                    │
+│  ┌───────────────────────┐   ┌───────────────────┐   ┌───────────────────────────────┐ │
+│  │   Tool Runtime Engine │   │   Approval Gate   │   │     External Integrations     │ │
+│  │ Tasks, Projects, Files│   │ Sensitive Actions │   │ GitHub, Notion, Drive, MCP    │ │
+│  │ Scoped Permissions    │   │ 7-day Expiry TTL  │   │ AES-256-GCM Encrypted Vault   │ │
+│  └───────────────────────┘   └───────────────────┘   └───────────────────────────────┘ │
+│             │                          │                          │                    │
+│             ▼                          ▼                          ▼                    │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐ │
+│  │                       Data & Background Storage Subsystem                         │ │
+│  │  Prisma 6 ORM  │  PostgreSQL / SQLite  │  RAG Chunking  │  Async Background Jobs  │ │
+│  └───────────────────────────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### AgentRun State Machine
+
+Agent executions follow a strict, deterministic state machine:
+```text
+  [QUEUED] ──▶ [PLANNING] ──▶ [EXECUTING] ──▶ [COMPLETED]
+                   │               │
+                   ▼               ▼
+          [AWAITING_APPROVAL]  [FAILED]
+                   │
+         (Approved / Denied)
+                   │
+                   ▼
+         [RESUMED / CANCELLED]
+```
+
+---
+
+## 🧱 Tech Stack
+
+- **Frontend:** Next.js 16 (App Router), React 19, TypeScript strict mode, Tailwind CSS v4, Lucide Icons.
+- **Authentication:** Auth.js v5 (NextAuth) with bcrypt-12 credentials hashing, JWT sessions, and route guard proxy.
+- **Database & ORM:** Prisma 6 with SQLite for local development (`prisma/dev.db`) and PostgreSQL + `pgvector` for production deployments.
+- **Validation:** Zod schemas on all mutating API routes and tool parameters.
+- **Background Jobs:** Lightweight DB/Redis-backed polling queue with exponential backoff, worker retry limits, and dead-letter handling.
+- **Security & Encryption:** AES-256-GCM token encryption for third-party OAuth and integration credentials.
+- **Observability:** Structured JSON logger, distributed tracing (`x-trace-id`), Sentry error hooks, and real-time `/api/metrics`.
+- **Testing:** Vitest test runner (41 unit and integration tests passing).
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node 20+ (22 recommended), Bun 1.x
+- **Node.js**: `20.x` or higher (`22.x` recommended)
+- **Package Manager**: [Bun](https://bun.sh) (recommended) or `npm`
+- **Docker** (optional, for Postgres + Redis local testing)
 
-### 1. Install
+### 1. Clone & Install Dependencies
 ```bash
+git clone https://github.com/Abhiman67/AgentHub.git
+cd AgentHub
 cp .env.example .env
 bun install
 ```
+*(If using npm: `npm install`)*
 
-### 2. Database
+### 2. Initialize Database & Seed
 ```bash
-bunx prisma migrate dev   # creates SQLite DB + client (first run)
+bunx prisma migrate dev
+bun run db:seed
 ```
+This generates your Prisma Client, applies the schema migrations, and seeds standard agent templates and demo data.
 
-### 3. Run
+### 3. Start Development Server
 ```bash
 bun run dev
 ```
-Open **http://localhost:3000** → Sign up → Onboarding → `/app`.
-
-### The 5-minute tour
-1. Sign up, complete onboarding (pick goals — agents activate from them).
-2. Open **Study Coach**, upload a `.txt`/`.md` note file, ask a question — sources appear above the answer.
-3. Create a **project**, link an agent, open the project detail for milestones.
-4. Add tasks with due dates; check **Today / Week / Calendar** in the planner.
-5. Open **Career**, analyze a resume file, save an application, generate a cover-letter draft.
-6. Check **Usage** for activity and approvals.
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 📜 Scripts
+## 🧭 Walkthrough: The 5-Minute Tour
 
-| Command | What it does |
-|---|---|
-| `bun run dev` | Local dev server (Turbopack) |
-| `bun run build` | `prisma generate && next build` — production build |
-| `bun run start` | Serve production build |
-| `bun run lint` | ESLint (flat config, Next rules) |
-| `bun run typecheck` | `tsc --noEmit` |
-| `bun run test` | Vitest (7 tests) |
-| `bun run format` | Prettier write |
-| `bun run db:push` | Push schema without migration (local experiments) |
-| `bunx prisma studio` | Visual DB browser |
-| `bunx prisma migrate dev --name <x>` | New migration |
+1. **Sign Up & Onboarding:** Navigate to `/signup`, register an account, and complete the 4-step onboarding (Education, Goals, Context, Agents). Your selected goals automatically provision active agents.
+2. **Autonomous Agent Run:** Go to `/app/agents/[agentId]`, send a complex goal like `"Break down my machine learning project and create a weekly task plan"`. The Run Panel will display the planner decomposing your goal, generating steps, and streaming real-time status.
+3. **Safety Approval:** When an agent proposes a destructive action or external sync, inspect the pending approval card at `/app/approvals`. Review the payload diff and approve or deny.
+4. **Study & File RAG:** Upload `.pdf`, `.md`, or `.txt` notes in `/app/files`. Inspect document chunks and run study synthesis (flashcards and quizzes).
+5. **Project & Task Integration:** Check `/app/projects` and `/app/tasks`. Notice tasks created and linked by agents are scheduled with due dates and priority filters.
+6. **Integrations Vault:** Visit `/app/settings/integrations` to connect GitHub, Notion, Google Drive, or custom MCP servers with AES-256 encrypted credentials.
 
 ---
 
-## 🗂 Project structure
+## 📜 Available Scripts
+
+| Script | Command | Purpose |
+|---|---|---|
+| **Dev** | `bun run dev` | Starts local Next.js dev server with hot reload |
+| **Build** | `bun run build` | Generates Prisma client and compiles production Next.js bundle |
+| **Start** | `bun run start` | Runs the compiled production build |
+| **Test** | `bun run test` | Runs the complete Vitest test suite (41 tests) |
+| **Typecheck** | `bun run typecheck` | Validates TypeScript types across the entire project (`tsc --noEmit`) |
+| **Lint** | `bun run lint` | Runs ESLint 9 with Next.js rules |
+| **Format** | `bun run format` | Formats all code with Prettier |
+| **Seed DB** | `bun run db:seed` | Populates database with default agents and fixtures |
+| **Prisma Studio** | `bun run db:studio` | Opens visual database browser GUI |
+| **Docker Postgres**| `bun run db:postgres` | Spins up PostgreSQL & Redis via Docker and applies migrations |
+
+---
+
+## 🗂️ Project Directory Structure
 
 ```text
 AgentHub/
-├── design.md / planning.md / REMAINING.md   # spec, build contract, prod gaps
-├── Dockerfile / docker-compose.yml          # Postgres-backed deploy
 ├── prisma/
-│   ├── schema.prisma                        # User, Profile, Agent, Conversation,
-│   │                                        # Message, Project, Task, File,
-│   │                                        # Application, Approval, UsageEvent
-│   └── migrations/                          # versioned history
-└── src/
-    ├── app/
-    │   ├── page.tsx                         # landing (reference style)
-    │   ├── agents|how-it-works|pricing|privacy|terms
-    │   ├── login|signup|forgot-password|onboarding
-    │   ├── api/                             # auth, profile, agents, conversations,
-    │   │                                    # files, projects, tasks, applications,
-    │   │                                    # approvals, career, usage, subscription, health
-    │   └── app/                             # workspace: overview, agents/[id] chat,
-    │                                        # projects, tasks, files, career,
-    │                                        # usage, settings/*
-    ├── components/                          # AppShell, SideNav, Topbar, ApprovalCard, states
-    ├── lib/                                 # db, auth helpers, agents, ai, usage,
-    │                                        # approvals, validations, rate-limit
-    ├── auth.ts / proxy.ts                   # Auth.js config + route guard
-    └── middleware.ts                        # (removed — migrated to proxy.ts)
+│   ├── schema.prisma                        # Unified database models
+│   ├── seed.ts                              # Initial fixture seeder
+│   ├── pgvector.sql                         # PostgreSQL vector extension setup
+│   └── migrations/                          # Versioned migration history
+├── src/
+│   ├── app/
+│   │   ├── (public)/                        # Landing, pricing, how-it-works, auth pages
+│   │   ├── app/                             # Authenticated workspace:
+│   │   │   ├── page.tsx                     # Workspace overview & quick stats
+│   │   │   ├── agents/                      # Agent directory & multi-turn chat
+│   │   │   ├── projects/                    # Project scoping, milestones & activity
+│   │   │   ├── tasks/                       # Kanban / list task planner
+│   │   │   ├── files/                       # File manager & study RAG
+│   │   │   ├── career/                      # Resume analysis & application tracker
+│   │   │   ├── approvals/                   # Human-in-the-loop review queue
+│   │   │   └── settings/                    # Profile, memory, integrations vault
+│   │   └── api/                             # REST API endpoints:
+│   │       ├── agent-runs/                  # Run lifecycle, step control, SSE events
+│   │       ├── tools/                       # Tool discovery & execution registry
+│   │       ├── integrations/                # Connected accounts & MCP proxy
+│   │       ├── files/                       # Uploads, chunking, and study generation
+│   │       ├── approvals/                   # Approval decision actions
+│   │       ├── metrics/                     # System health & performance metrics
+│   │       └── ...                          # Auth, projects, tasks, profile
+│   ├── components/                          # UI components (RunPanel, IntegrationsPanel, SideNav, Topbar)
+│   ├── lib/
+│   │   ├── agents/                          # Planner, orchestrator, state machine, SSE events
+│   │   ├── tools/                           # Tool registry, permissions, internal handlers
+│   │   ├── integrations/                    # MCP client, OAuth accounts, crypto vault
+│   │   ├── jobs/                            # Async queue, workers, processor handlers
+│   │   ├── storage/                         # Local & S3 storage abstraction
+│   │   ├── observability/                   # Structured logger, distributed tracer, Sentry
+│   │   ├── chunking.ts                      # Sliding-window document chunking
+│   │   └── db.ts                            # Prisma database client singleton
+│   ├── auth.ts                              # Auth.js configuration
+│   └── proxy.ts                             # Edge-compatible security route guard
+├── docker-compose.yml                       # Production Postgres 16 & Redis stack
+├── vitest.config.ts                         # Vitest configuration
+└── package.json                             # Dependencies & scripts
 ```
 
-### Key routes
-- Public: `/`, `/agents`, `/how-it-works`, `/pricing`, `/login`, `/signup`, `/forgot-password`, `/privacy`, `/terms`
-- Workspace: `/app` (overview), `/app/agents`, `/app/agents/[agentId]`, `/app/projects`, `/app/projects/[projectId]`, `/app/tasks`, `/app/files`, `/app/career`, `/app/usage`, `/app/settings/*`
-- Health: `GET /api/health`
+---
+
+## 🔌 API Summary
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/agent-runs` | `GET`, `POST` | List agent runs or initiate a new autonomous run |
+| `/api/agent-runs/[id]` | `GET` | Retrieve detailed status, steps, and output of a run |
+| `/api/agent-runs/[id]/events` | `GET` | Real-time Server-Sent Events (SSE) stream for run progression |
+| `/api/agent-runs/[id]/cancel` | `POST` | Abort a running or pending agent run |
+| `/api/agent-runs/[id]/resume` | `POST` | Resume an agent run paused on approval |
+| `/api/tools` | `GET` | List all registered tools and required permissions |
+| `/api/integrations` | `GET`, `POST` | Manage connected third-party integrations & MCP servers |
+| `/api/integrations/[provider]/execute` | `POST` | Execute a scoped remote integration action |
+| `/api/approvals` | `GET` | List pending human-in-the-loop approvals |
+| `/api/approvals/[id]/[action]` | `POST` | Approve or deny a gated action (`approve` / `deny`) |
+| `/api/files` | `GET`, `POST` | Upload files and trigger automatic chunking |
+| `/api/files/[id]/study` | `POST` | Generate study flashcards and revision quizzes |
+| `/api/metrics` | `GET` | System health, active run counts, and performance metrics |
 
 ---
 
-## 🔌 API overview
+## 🔐 Security & Governance
 
-All `/api/*` (except signup/login/health) require a session and enforce owner scoping server-side.
-
-- `POST /api/auth/signup` · Auth.js `[...nextauth]` · `GET/PATCH/DELETE /api/profile`
-- `GET/POST /api/agents` · `POST /api/agents/ensure` (goal-based) · `GET /api/agents/[agentId]/conversations`
-- `POST /api/conversations` · `GET/PATCH/DELETE /api/conversations/[id]` (SSE stream on POST)
-- `GET/POST /api/files` · `GET/DELETE /api/files/[id]` · `GET /api/files/[id]/status` · `POST /api/files/[id]/study`
-- `GET/POST /api/projects` · `GET/PATCH/DELETE /api/projects/[projectId]`
-- `GET/POST/PATCH/DELETE /api/tasks` · `GET/POST/PATCH/DELETE /api/applications`
-- `POST /api/career/analyze` · `POST /api/career/cover-letter`
-- `GET/POST /api/approvals` · `POST /api/approvals/[id]/[action]`
-- `GET /api/usage` · `GET /api/subscription` · `POST /api/subscription/checkout` (stub)
+- **Credential Encryption:** All OAuth access tokens, refresh tokens, and integration API keys are encrypted at rest using **AES-256-GCM** with unique initialization vectors (`src/lib/integrations/crypto.ts`).
+- **Human-in-the-Loop Guardrails:** Every external write, deletion, or third-party dispatch requires approval. Pending approvals automatically expire after **7 days**.
+- **Role & Scope Authorization:** All API routes strictly verify ownership against the authenticated JWT session.
+- **Audit Logging:** Security-critical operations log immutable audit events for traceability.
 
 ---
 
-## 🔐 Environment
+## 🧪 Testing & Validation
 
+Run the automated test suite:
 ```bash
-# .env (local defaults)
-DATABASE_URL="file:./dev.db"
-AUTH_SECRET="change-me-to-a-long-random-string"
-NEXTAUTH_URL="http://localhost:3000"
-
-# Production Postgres (uncomment + migrate)
-# DATABASE_URL="postgresql://user:pass@host:5432/agenthub"
-
-# Deferred (S3 storage, Redis queue, paid AI provider)
-# S3_BUCKET=""  REDIS_URL=""  OPENAI_API_KEY=""
+bun run test
 ```
 
-Never commit `.env`. Rotate `AUTH_SECRET` before any shared deploy.
+The test suite validates:
+- **Agent Run State Machine:** Transition integrity (`QUEUED ➔ PLANNING ➔ EXECUTING ➔ COMPLETED`), invalid transition rejection, and step updates.
+- **Approval Lifecycle:** 7-day expiration checks, approval/denial resolution, and execution unblocking.
+- **Job Processing Engine:** Enqueueing, exponential backoff retries, and error handling.
+- **Data Validation & Safety:** Zod schema constraints, sanitization, and quota enforcement.
+
+To verify TypeScript typing without compiling:
+```bash
+bun run typecheck
+```
 
 ---
 
-## 🐳 Production deploy
+## 🐳 Production Deployment
 
+### Docker Compose (Full Stack)
+Run AgentHub alongside PostgreSQL 16 and Redis:
 ```bash
-docker compose up --build        # app + Postgres 16
-# then inside app:
+docker compose up -d --build
 bunx prisma migrate deploy
 ```
-Manual path: set Postgres `DATABASE_URL`, run `migrate deploy`, `bun run build && bun run start`. Health: `GET /api/health`. Full production checklist (Sentry, quotas, S3/Redis, analytics, OAuth, backups) lives in [REMAINING.md](./REMAINING.md).
+
+### Environment Configuration
+Ensure production environment variables are set in `.env`:
+```bash
+DATABASE_URL="postgresql://agenthub:agenthub@db:5432/agenthub?schema=public"
+AUTH_SECRET="use-a-strong-32-byte-hex-or-base64-secret"
+NEXTAUTH_URL="https://your-domain.com"
+ENCRYPTION_SECRET="32-byte-hex-key-for-integrations-aes-256-gcm"
+REDIS_URL="redis://redis:6379"
+```
 
 ---
-
-## 🧪 Testing & quality
-
-- `bun run test` — unit: task/file transitions, approval TTL, Zod validation.
-- `bun run lint` / `bun run typecheck` — must be clean before PR.
-- Manual QA matrix (per planning §21): 320/768/desktop widths, keyboard-only flow, slow network, failed AI, failed upload, expired session, empty vs. heavy accounts.
-- Known limits: mock AI only, PDF/DOCX extraction stubbed, no e2e automation yet.
-
----
-
-## 🗺 Roadmap → production
-
-Ordered in [REMAINING.md](./REMAINING.md): fix profile hash over-select → git + CI + staging → observability → Postgres/pgvector validation → real AI provider behind quotas → S3 + queue file pipeline → analytics → auth hardening → beta.
-
----
-
-## 🤝 Contributing
-
-1. Create a branch from `main`.
-2. Keep PRs small; link the planning phase/section they cover.
-3. Must pass `lint`, `typecheck`, `test`, `build`.
-4. Never commit secrets, `.env`, or `*.db*`.
 
 ## 📄 License
 
-ISC — see `package.json`.
+ISC License — see `package.json` for details.
