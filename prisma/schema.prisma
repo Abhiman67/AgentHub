@@ -8,73 +8,80 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  passwordHash String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  profile      Profile?
-  agents       Agent[]
-  projects     Project[]
-  conversations Conversation[]
-  files        File[]
-  tasks        Task[]
-  applications Application[]
-  approvals    Approval[]
-  usageEvents  UsageEvent[]
-  subscription Subscription?
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  profile             Profile?
+  agents              Agent[]
+  projects            Project[]
+  conversations       Conversation[]
+  files               File[]
+  tasks               Task[]
+  applications        Application[]
+  approvals           Approval[]
+  usageEvents         UsageEvent[]
+  subscription        Subscription?
   passwordResetTokens PasswordResetToken[]
-  auditEvents AuditEvent[]
-  memberships WorkspaceMember[]
+  auditEvents         AuditEvent[]
+  memberships         WorkspaceMember[]
+  agentRuns           AgentRun[]
+  toolCalls           ToolCall[]
+  fileChunks          FileChunk[]
+  integrationAccounts IntegrationAccount[]
+  jobRecords          JobRecord[]
 }
 
 model Profile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  institution String?
-  degree      String?
-  semester    String?
-  goals       String   @default("[]")
-  subjects    String   @default("[]")
-  skills      String   @default("[]")
-  interests   String   @default("[]")
-  studyHours  Int?
-  careerTarget String?
-  onboardingDone Boolean @default(false)
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution    String?
+  degree         String?
+  semester       String?
+  goals          String   @default("[]")
+  subjects       String   @default("[]")
+  skills         String   @default("[]")
+  interests      String   @default("[]")
+  studyHours     Int?
+  careerTarget   String?
+  onboardingDone Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
 }
 
 model Agent {
-  id          String   @id @default(cuid())
-  ownerId     String?
-  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  template    String
-  name        String
-  role        String
-  description String
-  icon        String   @default("sparkles")
-  category    String
-  systemPrompt String
-  createdAt   DateTime @default(now())
+  id            String         @id @default(cuid())
+  ownerId       String?
+  owner         User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  template      String
+  name          String
+  role          String
+  description   String
+  icon          String         @default("sparkles")
+  category      String
+  systemPrompt  String
+  createdAt     DateTime       @default(now())
   conversations Conversation[]
+  runs          AgentRun[]
 
   @@unique([ownerId, template])
 }
 
 model Conversation {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   agentId   String
-  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  title     String    @default("New conversation")
+  agent     Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  title     String     @default("New conversation")
   projectId String?
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   messages  Message[]
+  runs      AgentRun[]
 
   @@index([agentId])
   @@index([userId, projectId])
@@ -93,20 +100,21 @@ model Message {
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name        String
-  description String   @default("")
-  type        String   @default("major")
-  status      String   @default("active")
-  targetDate  DateTime?
-  linkedAgentIds String @default("[]")
-  members        String @default("[]")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tasks       Task[]
-  conversations Conversation[]
+  id             String         @id @default(cuid())
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  description    String         @default("")
+  type           String         @default("major")
+  status         String         @default("active")
+  targetDate     DateTime?
+  linkedAgentIds String         @default("[]")
+  members        String         @default("[]")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  tasks          Task[]
+  conversations  Conversation[]
+  agentRuns      AgentRun[]
 
   @@index([ownerId])
 }
@@ -129,17 +137,68 @@ model Task {
 }
 
 model File {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name      String
-  mimeType  String
-  size       Int
-  status    String   @default("ready")
-  textContent String  @default("")
-  createdAt DateTime @default(now())
+  id            String      @id @default(cuid())
+  ownerId       String
+  owner         User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  mimeType      String
+  size          Int
+  status        String      @default("ready")
+  textContent   String      @default("")
+  storageKey    String?
+  failureReason String?
+  createdAt     DateTime    @default(now())
+  chunks        FileChunk[]
 
   @@index([ownerId, status])
+}
+
+model FileChunk {
+  id        String   @id @default(cuid())
+  fileId    String
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  index     Int
+  content   String
+  createdAt DateTime @default(now())
+
+  @@unique([fileId, index])
+  @@index([ownerId, fileId])
+}
+
+model IntegrationAccount {
+  id                    String    @id @default(cuid())
+  ownerId               String
+  owner                 User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider              String
+  scopes                String    @default("[]")
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  expiresAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([ownerId, provider])
+  @@index([ownerId])
+}
+
+model JobRecord {
+  id             String    @id @default(cuid())
+  type           String
+  idempotencyKey String    @unique
+  payload        String    @default("{}")
+  status         String    @default("queued")
+  retries        Int       @default(0)
+  maxRetries     Int       @default(3)
+  nextAttemptAt  DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User?     @relation(fields: [userId], references: [id])
+  userId         String?
+
+  @@index([type, status])
 }
 
 model Application {
@@ -158,18 +217,25 @@ model Application {
 }
 
 model Approval {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   agentId     String
   title       String
   description String
-  payload     String   @default("{}")
-  status      String   @default("pending")
-  createdAt   DateTime @default(now())
+  payload     String    @default("{}")
+  status      String    @default("pending")
+  runId       String?
+  run         AgentRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  toolCallId  String?
+  toolCall    ToolCall? @relation(fields: [toolCallId], references: [id], onDelete: SetNull)
+  risk        String    @default("workspace_write")
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
   decidedAt   DateTime?
 
   @@index([ownerId, status])
+  @@index([runId])
 }
 
 model UsageEvent {
@@ -184,27 +250,28 @@ model UsageEvent {
 }
 
 model Subscription {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan               String   @default("free")
-  status             String   @default("active")
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan               String    @default("free")
+  status             String    @default("active")
   provider           String?
-  providerCustomerId String?  @unique
-  providerSubId      String?  @unique
+  providerCustomerId String?   @unique
+  providerSubId      String?   @unique
   currentPeriodEnd   DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model PasswordResetToken {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String @unique
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
   expiresAt DateTime
-  usedAt DateTime?
-  createdAt DateTime @default(now())
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
   @@index([userId, expiresAt])
 }
 
@@ -215,48 +282,125 @@ model AuditEvent {
   action    String
   metadata  String   @default("{}")
   createdAt DateTime @default(now())
+
   @@index([ownerId, createdAt])
   @@index([action, createdAt])
 }
 
 model BillingEvent {
-  id String @id @default(cuid())
-  provider String
-  providerEventId String @unique
-  eventType String
-  receivedAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  provider        String
+  providerEventId String   @unique
+  eventType       String
+  receivedAt      DateTime @default(now())
 }
 
 model Workspace {
-  id String @id @default(cuid())
-  name String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  members WorkspaceMember[]
+  id          String            @id @default(cuid())
+  name        String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  members     WorkspaceMember[]
   invitations WorkspaceInvite[]
 }
 
 model WorkspaceMember {
-  id String @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
-  userId String
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role String @default("owner")
-  createdAt DateTime @default(now())
+  userId      String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("owner")
+  createdAt   DateTime  @default(now())
+
   @@unique([workspaceId, userId])
   @@index([userId, role])
 }
 
 model WorkspaceInvite {
-  id String @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
-  email String
-  tokenHash String @unique
-  role String @default("member")
-  expiresAt DateTime
-  acceptedAt DateTime?
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  tokenHash   String    @unique
+  role        String    @default("member")
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@index([workspaceId, email, expiresAt])
+}
+
+model AgentRun {
+  id               String        @id @default(cuid())
+  ownerId          String
+  owner            User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  agentId          String
+  agent            Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  conversationId   String?
+  conversation     Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  projectId        String?
+  project          Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  goal             String
+  status           String        @default("queued")
+  currentStepIndex Int           @default(0)
+  metadata         String        @default("{}")
+  errorMessage     String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  startedAt        DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  steps            AgentStep[]
+  toolCalls        ToolCall[]
+  approvals        Approval[]
+
+  @@index([ownerId, status, updatedAt])
+  @@index([conversationId])
+  @@index([projectId])
+}
+
+model AgentStep {
+  id               String     @id @default(cuid())
+  runId            String
+  run              AgentRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sequence         Int
+  kind             String
+  title            String
+  description      String     @default("")
+  status           String     @default("queued")
+  input            String?
+  output           String?
+  errorMessage     String?
+  requiresApproval Boolean    @default(false)
+  approvalId       String?
+  createdAt        DateTime   @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  toolCalls        ToolCall[]
+
+  @@index([runId, sequence])
+}
+
+model ToolCall {
+  id           String     @id @default(cuid())
+  runId        String?
+  run          AgentRun?  @relation(fields: [runId], references: [id], onDelete: SetNull)
+  stepId       String?
+  step         AgentStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  ownerId      String
+  owner        User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  toolName     String
+  risk         String     @default("read_only")
+  status       String     @default("queued")
+  input        String     @default("{}")
+  output       String?
+  errorMessage String?
+  createdAt    DateTime   @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  approvals    Approval[]
+
+  @@index([ownerId, createdAt])
+  @@index([runId, createdAt])
 }

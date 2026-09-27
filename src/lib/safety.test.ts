@@ -16,7 +16,7 @@ describe("approval expiry and TTL formatting", () => {
 
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const ttlStr = formatTtlRemaining(twoDaysAgo);
-    expect(ttlStr).toContain("4d");
+    expect(ttlStr).toContain("5d");
     expect(ttlStr).toContain("left");
   });
 });

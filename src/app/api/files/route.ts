@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { extractDocxText, extractPdfText } from "@/lib/parser";
 import { getQuota } from "@/lib/quotas";
+import { objectStorage, storageKeyFor } from "@/lib/storage";
+import "@/lib/jobs/processors";
+import { enqueue } from "@/lib/jobs/queue";
 
 export async function GET(req: Request) {
   const s = await auth();
@@ -34,32 +36,26 @@ export async function POST(req: Request) {
   const allowed = name.endsWith(".pdf") || name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".docx");
   if (!allowed) return NextResponse.json({ error: "PDF, TXT, MD or DOCX only" }, { status: 400 });
 
-  let text = "";
-  let status = "ready";
-
-  try {
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    const isPdf = bytes.length >= 5 && new TextDecoder("ascii").decode(bytes.slice(0, 5)) === "%PDF-";
-    const isZip = bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
-    if ((name.endsWith(".pdf") && !isPdf) || (name.endsWith(".docx") && !isZip)) {
-      return NextResponse.json({ error: "File contents do not match the extension" }, { status: 400 });
-    }
-    if (name.endsWith(".txt") || name.endsWith(".md")) {
-      text = new TextDecoder().decode(buffer).slice(0, 20000);
-    } else if (name.endsWith(".docx")) {
-      const extracted = await extractDocxText(buffer);
-      if (!extracted) status = "failed";
-      text = extracted.slice(0, 20000);
-    } else if (name.endsWith(".pdf")) {
-      const extracted = await extractPdfText(buffer);
-      if (!extracted) status = "failed";
-      text = extracted.slice(0, 20000);
-    }
-  } catch {
-    text = "";
-    status = "failed";
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const isPdf = bytes.length >= 5 && new TextDecoder("ascii").decode(bytes.slice(0, 5)) === "%PDF-";
+  const isZip = bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+  if ((name.endsWith(".pdf") && !isPdf) || (name.endsWith(".docx") && !isZip)) {
+    return NextResponse.json({ error: "File contents do not match the extension" }, { status: 400 });
   }
+  // AV-scan hook: provider-side scan runs here when configured; local dev records pass.
+  if (process.env.AV_SCAN_URL) {
+    try {
+      const res = await fetch(process.env.AV_SCAN_URL, { method: "POST", body: bytes as unknown as BodyInit });
+      if (!res.ok) return NextResponse.json({ error: "File rejected by malware scan" }, { status: 400 });
+    } catch {
+      return NextResponse.json({ error: "Scan unavailable, try again" }, { status: 503 });
+    }
+  }
+
+  const tmpId = crypto.randomUUID();
+  const key = storageKeyFor(u.id, tmpId, file.name);
+  await objectStorage.put(key, bytes, file.type || "application/octet-stream");
 
   const saved = await db.file.create({
     data: {
@@ -67,10 +63,19 @@ export async function POST(req: Request) {
       name: file.name,
       mimeType: file.type || "application/octet-stream",
       size: file.size,
-      status,
-      textContent: text,
+      status: "processing",
+      textContent: "",
+      storageKey: key,
     },
   });
 
-  return NextResponse.json({ file: saved }, { status: 201 });
+  try {
+    await enqueue("file.extract", { fileId: saved.id, ownerId: u.id }, { idempotencyKey: `file.extract:${saved.id}` });
+  } catch (err) {
+    await db.file.update({ where: { id: saved.id }, data: { status: "failed", failureReason: "EXTRACT_FAILED" } });
+    if (process.env.NODE_ENV !== "production") console.warn("file pipeline failed", err);
+  }
+  const final = await db.file.findUnique({ where: { id: saved.id } });
+
+  return NextResponse.json({ file: final ?? saved }, { status: 201 });
 }

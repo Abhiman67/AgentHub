@@ -100,13 +100,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  const relevantChunks = findRelevantChunks(message, allChunks, 5);
+  const relevantChunks = findRelevantChunks(message, allChunks, 5) as (TextChunk & { fileId: string; fileName: string })[];
   // Identify cited files based on matched chunks
   const citedFileMap = new Map<string, { id: string; name: string }>();
   for (const c of relevantChunks) {
-    if (!citedFileMap.has(c.fileId)) {
-      citedFileMap.set(c.fileId, { id: c.fileId, name: c.fileName });
-    }
+    if (!c.fileId || citedFileMap.has(c.fileId)) continue;
+    citedFileMap.set(c.fileId, { id: c.fileId, name: c.fileName });
   }
   const files = Array.from(citedFileMap.values()).slice(0, 3);
 

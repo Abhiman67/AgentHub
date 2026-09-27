@@ -1,0 +1,11 @@
+-- PostgreSQL + pgvector plan (staging/prod). SQLite remains the lightweight local option.
+-- 1) CREATE EXTENSION IF NOT EXISTS vector;
+-- 2) File chunks with embeddings (dims=1536 for OpenAI text-embedding-3-small; 16 for local stub):
+-- CREATE TABLE IF NOT EXISTS "FileChunk" (... "embedding" vector(1536));
+-- 3) Memory embeddings follow the same pattern when semantic memory lands.
+-- 4) Convert string-encoded JSON columns to native Json/JSONB:
+--    Profile.goals/subjects/skills/interests, Project.linkedAgentIds/members,
+--    AgentRun.metadata, AgentStep.input/output, ToolCall.input/output,
+--    Approval.payload, AuditEvent.metadata.
+-- 5) Set connection pool for serverless/pooler, e.g.
+--    DATABASE_URL="postgresql://user:pass@host:5432/agenthub?connection_limit=5&pool_timeout=10"

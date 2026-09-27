@@ -63,6 +63,14 @@ export default async function SettingsPage() {
       color: "blue",
       badge: "Audit log",
     },
+    {
+      title: "Connected Integrations",
+      desc: "Connect Drive, Classroom, Calendar, GitHub, Notion and Gmail with minimum scopes. Revoke anytime.",
+      href: "/app/settings/integrations",
+      icon: "◍",
+      color: "peach",
+      badge: "OAuth",
+    },
   ];
 
   return (

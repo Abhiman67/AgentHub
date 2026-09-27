@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ApprovalCard } from "@/components/ApprovalCard";
+import { RunPanel } from "@/components/RunPanel";
 import { ChatMessage } from "@/components/ChatMessage";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { ConfirmDialog, PromptDialog, Dialog } from "@/components/Dialog";
@@ -644,6 +645,10 @@ export default function ChatPage() {
             • Generate custom study flashcards<br />
             • Create milestone checklist
           </p>
+
+          <div style={{ marginTop: 12 }}>
+            <RunPanel agentId={agentId} conversationId={convId} projectId={projectId} />
+          </div>
         </aside>
       )}
 
