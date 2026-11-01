@@ -4,11 +4,16 @@ import { usePathname } from "next/navigation";
 
 export const links: [string, string, string][] = [
   ["Overview", "/app", "⌂"],
+  ["Learning", "/app/learning", "◒"],
   ["My agents", "/app/agents", "✦"],
   ["Projects", "/app/projects", "▣"],
   ["Tasks", "/app/tasks", "✓"],
+  ["Progress", "/app/progress", "↗"],
+  ["Routines", "/app/responsibilities", "◔"],
   ["Approvals", "/app/approvals", "🛡"],
-  ["Files & notes", "/app/files", "↥"],
+  ["Knowledge", "/app/knowledge", "↥"],
+  ["Note graph", "/app/knowledge/graph", "⌘"],
+  ["Folders & tags", "/app/knowledge/folders", "#"],
   ["Career", "/app/career", "↗"],
   ["Usage & plan", "/app/usage", "◧"],
   ["Settings", "/app/settings", "◈"],

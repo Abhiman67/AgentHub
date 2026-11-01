@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { listTools } from "@/lib/tools/registry";
+import { handleApi } from "@/lib/api";
 
-export async function GET() {
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const GET = handleApi(async () => {
   return NextResponse.json({ tools: listTools() }, { headers: { "Cache-Control": "no-store" } });
-}
+});

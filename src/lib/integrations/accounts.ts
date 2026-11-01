@@ -13,13 +13,13 @@ export async function connectProvider(ownerId: string, provider: string, opts: {
     create: {
       ownerId,
       provider: p,
-      scopes: JSON.stringify(scopes),
+      scopes,
       accessTokenEncrypted: encryptToken(accessToken),
       refreshTokenEncrypted: opts.refreshToken ? encryptToken(opts.refreshToken) : null,
       expiresAt: opts.expiresInSec ? new Date(Date.now() + opts.expiresInSec * 1000) : null,
     },
     update: {
-      scopes: JSON.stringify(scopes),
+      scopes,
       accessTokenEncrypted: encryptToken(accessToken),
       ...(opts.refreshToken ? { refreshTokenEncrypted: encryptToken(opts.refreshToken) } : {}),
     },
@@ -32,10 +32,12 @@ export async function disconnectProvider(ownerId: string, provider: string) {
 
 export async function listAccounts(ownerId: string) {
   const rows = await db.integrationAccount.findMany({ where: { ownerId }, orderBy: { provider: "asc" } });
-  return rows.map((r) => ({ provider: r.provider, scopes: safeArr(r.scopes), expiresAt: r.expiresAt, updatedAt: r.updatedAt }));
+  return rows.map((r) => ({ provider: r.provider, scopes: safeArr(r.scopes as unknown), expiresAt: r.expiresAt, updatedAt: r.updatedAt }));
 }
 
-function safeArr(raw: string): string[] {
+function safeArr(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw !== "string") return [];
   try {
     const v = JSON.parse(raw);
     return Array.isArray(v) ? v.map(String) : [];

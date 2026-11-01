@@ -22,6 +22,22 @@ export function IntegrationsPanel() {
     void load();
   }, []);
 
+  async function connectGoogleDrive() {
+    setBusy("drive");
+    try {
+      const res = await fetch("/api/integrations/drive/connect", { cache: "no-store" });
+      const d = await res.json();
+      if (res.ok && d.authUrl) {
+        window.location.href = d.authUrl;
+        return;
+      }
+    } finally {
+      setBusy("");
+    }
+    // OAuth unconfigured: fall back to mock connect for local dev.
+    await connect("drive");
+  }
+
   async function connect(provider: string) {
     setBusy(provider);
     await fetch(`/api/integrations/${provider}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -48,6 +64,8 @@ export function IntegrationsPanel() {
             <span style={{ color: "var(--color-muted)" }}>{connected.has(p.provider) ? "connected" : "not connected"}</span>
             {connected.has(p.provider) ? (
               <button type="button" className="tag" style={{ cursor: "pointer" }} disabled={busy === p.provider} onClick={() => disconnect(p.provider)}>Disconnect / Revoke</button>
+            ) : p.provider === "drive" ? (
+              <button type="button" className="tag" style={{ cursor: "pointer" }} disabled={busy === p.provider} onClick={() => void connectGoogleDrive()}>Connect with Google</button>
             ) : (
               <button type="button" className="tag" style={{ cursor: "pointer" }} disabled={busy === p.provider} onClick={() => connect(p.provider)}>Connect</button>
             )}

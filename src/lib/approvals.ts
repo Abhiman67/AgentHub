@@ -16,6 +16,42 @@ export function formatTtlRemaining(createdAt: Date, now = new Date()): string {
   return `${Math.max(1, minutes)}m left`;
 }
 
+export type ApprovableCheck = {
+  status: string;
+  ownerId: string;
+  createdAt: Date;
+  expiresAt: Date | null;
+};
+
+export class ApprovalDecisionError extends Error {
+  code: "ALREADY_DECIDED" | "EXPIRED" | "FORBIDDEN";
+  constructor(code: "ALREADY_DECIDED" | "EXPIRED" | "FORBIDDEN", message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/**
+ * Single-use guard for approval decisions. Verifies ownership, pending
+ * status and expiry (explicit expiresAt or 7-day TTL fallback).
+ * Call inside the decision transaction, after re-reading the row,
+ * so concurrent approve/deny attempts cannot both execute.
+ */
+export function assertApprovable(approval: ApprovableCheck, actorOwnerId: string, now = new Date()): void {
+  if (approval.ownerId !== actorOwnerId) {
+    throw new ApprovalDecisionError("FORBIDDEN", "Approval belongs to another user.");
+  }
+  if (approval.status !== "pending") {
+    throw new ApprovalDecisionError("ALREADY_DECIDED", `Approval already ${approval.status}.`);
+  }
+  if (approval.expiresAt && approval.expiresAt.getTime() < now.getTime()) {
+    throw new ApprovalDecisionError("EXPIRED", "Approval has expired.");
+  }
+  if (isExpired(approval.createdAt, now)) {
+    throw new ApprovalDecisionError("EXPIRED", "Approval has expired.");
+  }
+}
+
 /**
  * Sweeps and marks any pending approvals older than 7 days as expired.
  * Optionally scoped to a specific user.

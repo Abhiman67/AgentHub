@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog, Dialog } from "@/components/Dialog";
+import Dropdown from "@/components/Dropdown";
 
 type Task = {
   id: string;
@@ -9,9 +10,11 @@ type Task = {
   dueDate: string | null;
   priority: string;
   projectId: string | null;
+  subjectId: string | null;
 };
 
 type Project = { id: string; name: string };
+type Subject = { id: string; name: string; code: string | null };
 
 const PRI_STYLE: Record<string, React.CSSProperties> = {
   high: { background: "#ffe0d6", color: "#c95938" },
@@ -35,9 +38,27 @@ function getTaskDateKey(dueDate: string | null): string | null {
   return toLocalDateString(d);
 }
 
+function TaskMetricIcon({ kind }: { kind: "focus" | "deadline" | "momentum" | "alert" }) {
+  const paths = {
+    focus: <><circle cx="12" cy="12" r="8.25" /><path d="m8.5 12 2.3 2.3 4.8-5" /></>,
+    deadline: <><rect x="4" y="5.5" width="16" height="15" rx="2.5" /><path d="M8 3.5v4M16 3.5v4M4 10h16M8 14h3M8 17h6" /></>,
+    momentum: <><path d="M4 19.5h16M5 16l4.2-4.4 3.1 2.6L19 7.5" /><path d="M14.5 7.5H19v4.5" /></>,
+    alert: <><path d="M12 3.8 21 20H3L12 3.8Z" /><path d="M12 9v5M12 17h.01" /></>,
+  };
+
+  return (
+    <span className={`pulse-card-icon pulse-card-icon-${kind}`} aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {paths[kind]}
+      </svg>
+    </span>
+  );
+}
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   
   // Navigation & View Mode
   const [mode, setMode] = useState<"calendar" | "list">("calendar");
@@ -52,7 +73,12 @@ export default function TasksPage() {
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
-  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [showAddCourseDialog, setShowAddCourseDialog] = useState(false);
+  const [courseName, setCourseName] = useState("");
+  const [courseCode, setCourseCode] = useState("");
+  const [courseError, setCourseError] = useState("");
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
 
   // Modals
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -79,11 +105,13 @@ export default function TasksPage() {
   const load = () => {
     fetch("/api/tasks").then((r) => r.json()).then((d) => setTasks(d.tasks ?? []));
     fetch("/api/projects").then((r) => r.json()).then((d) => setProjects(d.projects ?? []));
+    fetch("/api/subjects").then((r) => r.json()).then((d) => setSubjects(d.subjects ?? []));
   };
 
   useEffect(() => { load(); }, []);
 
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
+  const subjectMap = useMemo(() => new Map(subjects.map((s) => [s.id, s.name])), [subjects]);
 
   // Senior Product Designer: Academic Velocity Metrics
   const metrics = useMemo(() => {
@@ -135,7 +163,7 @@ export default function TasksPage() {
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (hideCompleted && t.status === "completed") return false;
-      if (activeCourseFilter !== "all" && t.projectId !== activeCourseFilter) return false;
+      if (activeCourseFilter !== "all" && t.subjectId !== activeCourseFilter) return false;
       return true;
     });
   }, [tasks, activeCourseFilter, hideCompleted]);
@@ -162,14 +190,39 @@ export default function TasksPage() {
         title,
         dueDate: due || undefined,
         priority,
-        projectId: selectedProject || undefined,
+        subjectId: selectedSubjectId || undefined,
       }),
     });
     setTitle("");
     setDue("");
     setPriority("medium");
-    setSelectedProject("");
+    setSelectedSubjectId("");
     load();
+  }
+
+  async function createCourse(e: React.FormEvent) {
+    e.preventDefault();
+    if (!courseName.trim()) return;
+    setCourseError("");
+    setIsCreatingCourse(true);
+    try {
+      const response = await fetch("/api/subjects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: courseName.trim(), code: courseCode.trim() || undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message ?? data.error ?? "Could not create course.");
+      setSubjects((current) => [data.subject, ...current.filter((subject) => subject.id !== data.subject.id)]);
+      setSelectedSubjectId(data.subject.id);
+      setCourseName("");
+      setCourseCode("");
+      setShowAddCourseDialog(false);
+    } catch (error) {
+      setCourseError(error instanceof Error ? error.message : "Could not create course.");
+    } finally {
+      setIsCreatingCourse(false);
+    }
   }
 
   // Create Task for a Specific Day (Calendar day click or +)
@@ -421,23 +474,16 @@ export default function TasksPage() {
   return (
     <>
       {/* Top Header */}
-      <div className="page-head">
+      <div className="page-head tasks-page-head">
         <div>
           <h1>Tasks & planner</h1>
           <p>Schedule academic deadlines, study blocks, and milestones with Notion-grade calendar intelligence.</p>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div className="tasks-page-actions">
           <button
             type="button"
             onClick={() => setShowStudyPlanModal(true)}
-            className="button"
-            style={{
-              background: "#fff4f0",
-              color: "var(--color-brand)",
-              borderColor: "#ffdcd0",
-              fontSize: 13,
-              padding: "9px 16px",
-            }}
+            className="button accent sm"
           >
             ✦ AI Study Plan
           </button>
@@ -450,7 +496,7 @@ export default function TasksPage() {
               onClick={() => setMode("calendar")}
               className={`notion-view-tab ${mode === "calendar" ? "active" : ""}`}
             >
-              📅 Calendar
+              Calendar
             </button>
             <button
               type="button"
@@ -459,7 +505,7 @@ export default function TasksPage() {
               onClick={() => setMode("list")}
               className={`notion-view-tab ${mode === "list" ? "active" : ""}`}
             >
-              ☰ List
+              List
             </button>
           </div>
         </div>
@@ -469,7 +515,7 @@ export default function TasksPage() {
       <div className="academic-pulse-grid">
         <div className="pulse-card">
           <div className="pulse-card-label">
-            <span>⚡</span> Today&apos;s Focus
+            <TaskMetricIcon kind="focus" /> Today&apos;s Focus
           </div>
           <div className="pulse-card-value">
             {metrics.dueTodayCount > 0 ? (
@@ -479,7 +525,7 @@ export default function TasksPage() {
             )}
             {metrics.overdueCount > 0 && (
               <span className="tag" style={{ background: "#fee2e2", color: "#dc2626", fontSize: 11, padding: "2px 6px" }}>
-                ⚠️ {metrics.overdueCount} overdue
+                <TaskMetricIcon kind="alert" /> {metrics.overdueCount} overdue
               </span>
             )}
           </div>
@@ -488,7 +534,7 @@ export default function TasksPage() {
 
         <div className="pulse-card">
           <div className="pulse-card-label">
-            <span>🎯</span> Next Major Deadline
+            <TaskMetricIcon kind="deadline" /> Next Major Deadline
           </div>
           <div className="pulse-card-value" style={{ fontSize: 15, lineHeight: 1.3 }}>
             {metrics.nextMilestone ? (
@@ -513,7 +559,7 @@ export default function TasksPage() {
 
         <div className="pulse-card">
           <div className="pulse-card-label">
-            <span>📈</span> Weekly Momentum
+            <TaskMetricIcon kind="momentum" /> Weekly Momentum
           </div>
           <div className="pulse-card-value">
             {metrics.completionRate}%
@@ -538,7 +584,8 @@ export default function TasksPage() {
             onKeyDown={(e) => e.key === "Enter" && create()}
             placeholder="Add task or assignment (e.g., Read Lecture 4 by Friday)…"
             aria-label="Task title"
-            style={{ flex: "2 1 200px", height: 40, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)" }}
+            className="qa-control"
+            style={{ flex: "2 1 200px" }}
           />
 
           <label htmlFor="task-due" className="sr-only">Due date</label>
@@ -548,37 +595,34 @@ export default function TasksPage() {
             value={due}
             onChange={(e) => setDue(e.target.value)}
             aria-label="Due date"
-            style={{ flex: "1 1 120px", height: 40, padding: "0 10px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)", fontSize: 12 }}
+            className="qa-control"
+            style={{ flex: "1 1 120px" }}
           />
 
-          <label htmlFor="task-priority" className="sr-only">Priority</label>
-          <select
-            id="task-priority"
+          <Dropdown
+            label="Task priority"
             value={priority}
-            onChange={(e) => setPriority(e.target.value as "low" | "medium" | "high")}
-            aria-label="Task priority"
-            style={{ flex: "1 1 110px", height: 40, padding: "0 10px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)", fontSize: 12 }}
-          >
-            <option value="low">🟢 Low</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="high">🔴 High (Exam)</option>
-          </select>
+            onChange={(v) => setPriority(v as "low" | "medium" | "high")}
+            options={[
+              { value: "low", label: "Low", dot: "#3b7e32" },
+              { value: "medium", label: "Medium", dot: "#a69a84" },
+              { value: "high", label: "High · Exam", dot: "#d93829" },
+            ]}
+          />
 
-          <label htmlFor="task-project" className="sr-only">Project</label>
-          <select
-            id="task-project"
-            value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-            aria-label="Link to project"
-            style={{ flex: "1 1 120px", height: 40, padding: "0 10px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)", fontSize: 12 }}
-          >
-            <option value="">No Course</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <Dropdown
+            label="Course"
+            value={selectedSubjectId}
+            onChange={setSelectedSubjectId}
+            actionLabel="Add a course"
+            onAction={() => { setCourseError(""); setShowAddCourseDialog(true); }}
+            options={[
+              { value: "", label: "No course" },
+              ...subjects.map((subject) => ({ value: subject.id, label: subject.code ? `${subject.code} · ${subject.name}` : subject.name })),
+            ]}
+          />
 
-          <button className="button" onClick={create} style={{ height: 40, padding: "0 18px", fontSize: 13 }}>
+          <button className="button primary sm" onClick={create}>
             + Add task
           </button>
         </div>
@@ -596,16 +640,16 @@ export default function TasksPage() {
         >
           All Subjects ({tasks.length})
         </button>
-        {projects.map((p) => {
-          const count = tasks.filter((t) => t.projectId === p.id).length;
+        {subjects.map((subject) => {
+          const count = tasks.filter((t) => t.subjectId === subject.id).length;
           return (
             <button
-              key={p.id}
+              key={subject.id}
               type="button"
-              onClick={() => setActiveCourseFilter(p.id)}
-              className={`subject-chip ${activeCourseFilter === p.id ? "active" : ""}`}
+              onClick={() => setActiveCourseFilter(subject.id)}
+              className={`subject-chip ${activeCourseFilter === subject.id ? "active" : ""}`}
             >
-              📁 {p.name} ({count})
+              {subject.name} ({count})
             </button>
           );
         })}
@@ -617,7 +661,7 @@ export default function TasksPage() {
             className={`subject-chip ${hideCompleted ? "active" : ""}`}
             title="Toggle completed items visibility"
           >
-            {hideCompleted ? "✓ Showing Active Only" : "👁 Include Completed"}
+            {hideCompleted ? "Active only" : "Include completed"}
           </button>
         </div>
       </div>
@@ -786,6 +830,7 @@ export default function TasksPage() {
 
             {shownInList.map((t) => {
               const projectName = t.projectId ? projectMap.get(t.projectId) : null;
+              const subjectName = t.subjectId ? subjectMap.get(t.subjectId) : null;
               return (
                 <div key={t.id} className="list-row" style={{ alignItems: "center" }}>
                   <button
@@ -803,6 +848,11 @@ export default function TasksPage() {
                     </b>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
                       <small>{t.dueDate ? `Due ${new Date(t.dueDate).toLocaleDateString()}` : "No due date"}{t.status === "completed" ? " · Done" : ""}</small>
+                      {subjectName && (
+                        <span className="tag" style={{ fontSize: 10, padding: "2px 6px" }}>
+                          {subjectName}
+                        </span>
+                      )}
                       {projectName && (
                         <span className="tag" style={{ fontSize: 10, padding: "2px 6px" }}>
                           📁 {projectName}
@@ -869,19 +919,18 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => toggle(selectedTask)}
-                className="button"
-                style={{
-                  padding: "8px 14px",
-                  fontSize: 12,
-                  background: selectedTask.status === "completed" ? "#f0ece2" : "var(--color-ink)",
-                  color: selectedTask.status === "completed" ? "var(--color-ink)" : "#ffffff",
-                }}
+                className={selectedTask.status === "completed" ? "dialog-btn-cancel" : "dialog-btn-confirm default"}
               >
                 {selectedTask.status === "completed" ? "↺ Mark as Incomplete" : "✓ Mark as Completed"}
               </button>
               <span className="tag" style={PRI_STYLE[selectedTask.priority] ?? {}}>
                 {selectedTask.priority.toUpperCase()} priority
               </span>
+              {selectedTask.subjectId && (
+                <span className="tag" style={{ fontSize: 11 }}>
+                  {subjectMap.get(selectedTask.subjectId) ?? "Course"}
+                </span>
+              )}
               {selectedTask.projectId && (
                 <span className="tag" style={{ fontSize: 11 }}>
                   📁 {projectMap.get(selectedTask.projectId) ?? "Project"}
@@ -946,15 +995,7 @@ export default function TasksPage() {
                   setTaskToDelete(selectedTask);
                   setSelectedTask(null);
                 }}
-                style={{
-                  background: "none",
-                  border: 0,
-                  color: "#d93829",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  padding: 4,
-                }}
+                className="link-danger"
               >
                 Delete task
               </button>
@@ -962,14 +1003,57 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => setSelectedTask(null)}
-                className="button secondary"
-                style={{ padding: "8px 16px", fontSize: 12.5 }}
+                className="dialog-btn-cancel"
               >
                 Close
               </button>
             </div>
           </div>
         )}
+      </Dialog>
+
+      <Dialog
+        isOpen={showAddCourseDialog}
+        onClose={() => { if (!isCreatingCourse) setShowAddCourseDialog(false); }}
+        title="Add a course"
+        description="Create a course to organize and filter your study tasks."
+        maxWidth={420}
+      >
+        <form onSubmit={createCourse}>
+          <div className="field">
+            <label htmlFor="task-course-name">Course name</label>
+            <input
+              id="task-course-name"
+              className="dialog-input"
+              value={courseName}
+              onChange={(e) => setCourseName(e.target.value)}
+              placeholder="e.g. Data Mining"
+              maxLength={120}
+              autoFocus
+              required
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="task-course-code">Course code <span style={{ color: "var(--color-muted)", fontWeight: 500 }}>(optional)</span></label>
+            <input
+              id="task-course-code"
+              className="dialog-input"
+              value={courseCode}
+              onChange={(e) => setCourseCode(e.target.value)}
+              placeholder="e.g. CS301"
+              maxLength={40}
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+          {courseError && <p className="files-error" role="alert">{courseError}</p>}
+          <div className="dialog-actions">
+            <button type="button" className="dialog-btn-cancel" onClick={() => setShowAddCourseDialog(false)} disabled={isCreatingCourse}>Cancel</button>
+            <button type="submit" className="dialog-btn-confirm brand" disabled={isCreatingCourse || !courseName.trim()}>
+              {isCreatingCourse ? "Adding…" : "Add course"}
+            </button>
+          </div>
+        </form>
       </Dialog>
 
       {/* Quick Schedule for Date Modal */}
@@ -999,35 +1083,31 @@ export default function TasksPage() {
               <label htmlFor="schedule-priority" style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Priority
               </label>
-              <select
-                id="schedule-priority"
+              <Dropdown
+                label="Priority"
                 value={schedulePriority}
-                onChange={(e) => setSchedulePriority(e.target.value as "low" | "medium" | "high")}
-                className="dialog-input"
-                style={{ marginBottom: 0 }}
-              >
-                <option value="low">Low priority</option>
-                <option value="medium">Medium priority</option>
-                <option value="high">High priority</option>
-              </select>
+                onChange={(v) => setSchedulePriority(v as "low" | "medium" | "high")}
+                options={[
+                  { value: "low", label: "Low priority", dot: "#3b7e32" },
+                  { value: "medium", label: "Medium priority", dot: "#a69a84" },
+                  { value: "high", label: "High priority", dot: "#d93829" },
+                ]}
+              />
             </div>
 
             <div>
               <label htmlFor="schedule-project" style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Project / Course
               </label>
-              <select
-                id="schedule-project"
+              <Dropdown
+                label="Project or course"
                 value={scheduleProjectId}
-                onChange={(e) => setScheduleProjectId(e.target.value)}
-                className="dialog-input"
-                style={{ marginBottom: 0 }}
-              >
-                <option value="">No project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                onChange={setScheduleProjectId}
+                options={[
+                  { value: "", label: "No project" },
+                  ...projects.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+              />
             </div>
           </div>
 
@@ -1093,17 +1173,16 @@ export default function TasksPage() {
               <label htmlFor="study-days" style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Prep Duration
               </label>
-              <select
-                id="study-days"
-                value={studyDays}
-                onChange={(e) => setStudyDays(Number(e.target.value))}
-                className="dialog-input"
-                style={{ marginBottom: 0 }}
-              >
-                <option value={3}>3-Day Sprint</option>
-                <option value={5}>5-Day Balanced</option>
-                <option value={7}>7-Day Deep Dive</option>
-              </select>
+              <Dropdown
+                label="Prep duration"
+                value={String(studyDays)}
+                onChange={(v) => setStudyDays(Number(v))}
+                options={[
+                  { value: "3", label: "3-Day Sprint" },
+                  { value: "5", label: "5-Day Balanced" },
+                  { value: "7", label: "7-Day Deep Dive" },
+                ]}
+              />
             </div>
           </div>
 
@@ -1111,18 +1190,15 @@ export default function TasksPage() {
             <label htmlFor="study-project" style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
               Link to Project / Course (optional)
             </label>
-            <select
-              id="study-project"
+            <Dropdown
+              label="Link to project or course"
               value={studyProjectId}
-              onChange={(e) => setStudyProjectId(e.target.value)}
-              className="dialog-input"
-              style={{ marginBottom: 0 }}
-            >
-              <option value="">None</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+              onChange={setStudyProjectId}
+              options={[
+                { value: "", label: "None" },
+                ...projects.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+            />
           </div>
 
           <div className="dialog-actions">

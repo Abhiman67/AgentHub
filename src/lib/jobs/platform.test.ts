@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import { backoffMs, MAX_EXECUTION_MS } from "./types";
+import { getJobMode } from "./redis";
+import { bullJobId, bullOptions } from "./bull";
 import { pseudoEmbedding } from "./processors";
 import { storageKeyFor } from "../storage";
 import { localStorage } from "../storage/local";
@@ -49,6 +51,34 @@ describe("integrations: crypto + scopes", () => {
   it("enforces minimum scopes", () => {
     expect(() => assertScopes(["drive.readonly"], ["drive.readonly"])).not.toThrow();
     expect(() => assertScopes([], ["drive.readonly"])).toThrow();
+  });
+});
+
+describe("queue modes (Milestone 5)", () => {
+  const prevMode = process.env.JOB_EXECUTION_MODE;
+  const prevRedis = process.env.REDIS_URL;
+  afterEach(() => {
+    if (prevMode === undefined) delete process.env.JOB_EXECUTION_MODE;
+    else process.env.JOB_EXECUTION_MODE = prevMode;
+    if (prevRedis === undefined) delete process.env.REDIS_URL;
+    else process.env.REDIS_URL = prevRedis;
+  });
+  it("defaults to inline", () => {
+    delete process.env.JOB_EXECUTION_MODE;
+    expect(getJobMode()).toBe("inline");
+  });
+  it("selects redis only with REDIS_URL, else errors loudly", () => {
+    process.env.JOB_EXECUTION_MODE = "redis";
+    delete process.env.REDIS_URL;
+    expect(() => getJobMode()).toThrow("REDIS_URL");
+    process.env.REDIS_URL = "redis://localhost:6379";
+    expect(getJobMode()).toBe("redis");
+  });
+  it("maps stable BullMQ job ids and retry options", () => {
+    expect(bullJobId("file.extract", "abc")).toBe("file.extract:abc");
+    const opts = bullOptions(3);
+    expect(opts.attempts).toBe(4);
+    expect(opts.backoff).toMatchObject({ type: "exponential" });
   });
 });
 

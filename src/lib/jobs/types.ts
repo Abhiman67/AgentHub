@@ -1,4 +1,4 @@
-export type JobType = "file.extract" | "file.chunk" | "file.embed" | "agent.run" | "agent.resume" | "agent.retry" | "usage.aggregate";
+export type JobType = "file.extract" | "file.chunk" | "file.embed" | "agent.run" | "agent.resume" | "agent.retry" | "usage.aggregate" | "responsibility.tick";
 
 export type Job<T = Record<string, unknown>> = {
   id: string;
@@ -20,6 +20,7 @@ export const MAX_EXECUTION_MS: Record<JobType, number> = {
   "agent.resume": 120_000,
   "agent.retry": 120_000,
   "usage.aggregate": 30_000,
+  "responsibility.tick": 120_000,
 };
 
 export function backoffMs(attempt: number): number {

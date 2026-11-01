@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { AGENT_TEMPLATES } from "@/lib/agents";
 import { agentCreateSchema } from "@/lib/validations";
+import { handleApi, invalid } from "@/lib/api";
 
-async function userId() {
-  const s = await auth();
-  if (!s?.user?.email) return null;
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  return u?.id ?? null;
-}
-
-export async function GET() {
-  const uid = await userId();
-  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const GET = handleApi(async (_req, { userId: uid }) => {
   const agents = await db.agent.findMany({
     where: { ownerId: uid },
     select: {
@@ -31,17 +22,15 @@ export async function GET() {
   });
   const safeTemplates = AGENT_TEMPLATES.map(({ systemPrompt: _, ...rest }) => rest);
   return NextResponse.json({ agents, templates: safeTemplates });
-}
+});
 
-export async function POST(req: Request) {
-  const uid = await userId();
-  if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const POST = handleApi(async (req, { userId: uid }) => {
   const body = await req.json();
   const parsed = agentCreateSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) throw invalid("Invalid input");
   const { template, name, role, description, category, systemPrompt } = parsed.data;
   if (template === "custom") {
-    if (!name || !role) return NextResponse.json({ error: "Name and role required" }, { status: 400 });
+    if (!name || !role) throw invalid("Name and role required");
     const agent = await db.agent.create({
       data: {
         ownerId: uid, template: `custom-${Date.now()}`,
@@ -54,11 +43,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ agent }, { status: 201 });
   }
   const t = AGENT_TEMPLATES.find((x) => x.template === template);
-  if (!t) return NextResponse.json({ error: "Unknown template" }, { status: 400 });
+  if (!t) throw invalid("Unknown template");
   const agent = await db.agent.upsert({
     where: { ownerId_template: { ownerId: uid, template: t.template } },
     create: { ownerId: uid, template: t.template, name: t.name, role: t.role, description: t.description, icon: t.icon, category: t.category, systemPrompt: t.systemPrompt },
     update: {},
   });
   return NextResponse.json({ agent }, { status: 201 });
-}
+});

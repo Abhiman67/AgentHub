@@ -1,12 +1,12 @@
-# AgentHub Implementation Planning Document
+# Backoff Implementation Planning Document
 
 ## Instructions for the coding agent
 
-You are building **AgentHub**, a student-focused SaaS platform that gives each student a personal team of specialized AI agents. The product must help students study, manage projects, improve career readiness and organize daily work.
+You are building **Backoff**, a student-focused SaaS platform that gives each student a personal team of specialized AI agents. The product must help students study, manage projects, improve career readiness and organize daily work.
 
 This document is the implementation contract. Follow it in order. Do not jump directly into advanced automation. Build a stable, usable MVP first, then add advanced features only after the core workflow works end to end.
 
-The current repository contains an initial static landing page in `index.html` and a product/design specification in `AGENTHUB_DESIGN.md`. Preserve the existing visual direction unless there is a strong usability reason to change it.
+The current repository contains an initial static landing page in `index.html` and a product/design specification in `BACKOFF_DESIGN.md`. Preserve the existing visual direction unless there is a strong usability reason to change it.
 
 ---
 
@@ -14,7 +14,7 @@ The current repository contains an initial static landing page in `index.html` a
 
 Build a responsive web-based SaaS application with two experiences:
 
-1. A public marketing website that explains AgentHub and converts visitors into signups or waitlist users.
+1. A public marketing website that explains Backoff and converts visitors into signups or waitlist users.
 2. An authenticated student workspace where users can create agents, chat with them, upload study material, manage projects and track progress.
 
 The first release should feel complete even if some advanced integrations are mocked or deferred.
@@ -23,7 +23,7 @@ The first release should feel complete even if some advanced integrations are mo
 
 Use this statement consistently:
 
-> AgentHub is a personal AI team for studying smarter, building better projects and getting ahead in your career.
+> Backoff is a personal AI team for studying smarter, building better projects and getting ahead in your career.
 
 Do not present the product as a generic chatbot. The main differentiator is specialized agents working inside a shared student workspace.
 
@@ -123,7 +123,7 @@ The initial implementation may use one provider such as OpenAI or Gemini. All AP
 Before writing application code:
 
 1. Inspect the existing repository and preserve unrelated user files.
-2. Read `AGENTHUB_DESIGN.md` completely.
+2. Read `BACKOFF_DESIGN.md` completely.
 3. Identify whether a framework already exists.
 4. If the repository is only a static prototype, create a clean app structure around it.
 5. Add a README with setup, environment variables and development commands.
@@ -799,7 +799,7 @@ All interactive components must have keyboard states, focus states and accessibl
 
 ## 19. Design implementation rules
 
-Use the design specification in `AGENTHUB_DESIGN.md` as the source of truth for colors, typography, spacing and content direction.
+Use the design specification in `BACKOFF_DESIGN.md` as the source of truth for colors, typography, spacing and content direction.
 
 ### Preserve these visual characteristics
 
@@ -1090,7 +1090,7 @@ The MVP is complete only when:
 - Authorization is enforced server-side.
 - `.env.example` and setup instructions are complete.
 - No real secrets or private test files are committed.
-- The interface follows `AGENTHUB_DESIGN.md`.
+- The interface follows `BACKOFF_DESIGN.md`.
 
 ## 25. Final instruction to the coding agent
 

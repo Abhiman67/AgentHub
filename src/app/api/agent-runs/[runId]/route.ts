@@ -1,25 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-
-function err(code: string, message: string, status: number) {
-  return NextResponse.json({ error: { code, message, requestId: crypto.randomUUID() } }, { status, headers: { "Cache-Control": "no-store" } });
-}
+import { getOwnedRunDetail } from "@/lib/agents/run-views";
+import { apiError, validateRunId } from "@/lib/api-errors";
 
 export async function GET(_: Request, { params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
+  if (!validateRunId(runId)) return apiError("INVALID_INPUT", "Invalid run id.", 400);
   const s = await auth();
-  if (!s?.user?.email) return err("UNAUTHORIZED", "Sign in required.", 401);
+  if (!s?.user?.email) return apiError("UNAUTHORIZED", "Sign in required.", 401);
   const u = await db.user.findUnique({ where: { email: s.user.email } });
-  const run = await db.agentRun.findFirst({
-    where: { id: runId, ownerId: u?.id },
-    include: {
-      steps: { orderBy: { sequence: "asc" } },
-      toolCalls: { orderBy: { createdAt: "asc" } },
-      approvals: { orderBy: { createdAt: "desc" }, take: 10 },
-      agent: { select: { name: true, template: true, role: true } },
-    },
-  });
-  if (!run) return err("RUN_NOT_FOUND", "Agent run was not found.", 404);
+  if (!u) return apiError("USER_NOT_FOUND", "User not found.", 404);
+  const run = await getOwnedRunDetail(u.id, runId);
+  if (!run) return apiError("RUN_NOT_FOUND", "Agent run was not found.", 404);
   return NextResponse.json({ run }, { headers: { "Cache-Control": "no-store" } });
 }

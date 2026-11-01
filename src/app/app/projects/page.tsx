@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Dropdown from "@/components/Dropdown";
 
 type Task = { id: string; title: string; status: string };
 type Project = { id: string; name: string; description: string; type: string; tasks: Task[]; updatedAt: string };
@@ -28,7 +29,8 @@ export default function ProjectsPage() {
   }
   async function linkAgent(pid: string, agentId: string) {
     const proj = projects.find((p) => p.id === pid);
-    const linked: string[] = JSON.parse((proj as unknown as { linkedAgentIds?: string })?.linkedAgentIds || "[]");
+    const raw = (proj as unknown as { linkedAgentIds?: unknown })?.linkedAgentIds;
+    const linked: string[] = Array.isArray(raw) ? (raw as string[]) : [];
     if (!linked.includes(agentId)) linked.push(agentId);
     await fetch(`/api/projects/${pid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ linkedAgentIds: linked }) });
     load();
@@ -42,8 +44,8 @@ export default function ProjectsPage() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <label htmlFor="project-name" className="sr-only">New project name</label>
-          <input id="project-name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} placeholder="New project name…" aria-label="New project name" style={{ height: 44, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 999, background: "var(--color-card)" }} />
-          <button className="button" onClick={create}>+ New project</button>
+          <input id="project-name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} placeholder="New project name…" aria-label="New project name" className="qa-control" />
+          <button className="button primary" onClick={create}>+ New project</button>
         </div>
       </div>
       {projects.length === 0 ? (
@@ -63,10 +65,14 @@ export default function ProjectsPage() {
                 <div className="agent-foot" style={{ marginTop: 10 }}>
                   <span>{remaining} tasks remaining</span><b>{pct}%</b>
                 </div>
-                <select aria-label={`Link agent to ${p.name}`} defaultValue="" onChange={(e) => e.target.value && linkAgent(p.id, e.target.value)} style={{ marginTop: 12, width: "100%", padding: 9, border: "1px solid var(--color-line)", borderRadius: 10, fontSize: 12 }}>
-                  <option value="">Link an agent…</option>
-                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <div style={{ marginTop: 12 }}>
+                  <Dropdown
+                    value=""
+                    options={[{ value: "", label: "Link an agent…" }, ...agents.map((a) => ({ value: a.id, label: a.name }))]}
+                    onChange={(v) => v && linkAgent(p.id, v)}
+                    label={`Link agent to ${p.name}`}
+                  />
+                </div>
               </article>
             );
           })}

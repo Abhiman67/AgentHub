@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import type { AgentTool, ToolContext } from "./types";
+import { createTaskTool, updateTaskTool } from "./internal/tasks";
 
 const getProfileTool: AgentTool<Record<string, never>, Record<string, unknown>> = {
   name: "get_profile",
@@ -62,50 +63,6 @@ const getProjectTasksTool: AgentTool<{ projectId: string }, { id: string; title:
     if (!p) throw new Error("Project not found");
     const tasks = await db.task.findMany({ where: { projectId: input.projectId, ownerId: ctx.ownerId }, take: 20 });
     return tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }));
-  },
-};
-
-const createTaskTool: AgentTool<{ title: string; projectId?: string; priority?: string }, { id: string; title: string }> = {
-  name: "create_task",
-  description: "Create a task (approval-gated)",
-  risk: "workspace_write",
-  inputSchema: z.object({
-    title: z.string().min(1).max(200),
-    projectId: z.string().min(1).optional(),
-    priority: z.enum(["low", "medium", "high"]).optional(),
-  }),
-  execute: async (input, ctx) => {
-    if (input.projectId) {
-      const p = await db.project.findFirst({ where: { id: input.projectId, ownerId: ctx.ownerId }, select: { id: true } });
-      if (!p) throw new Error("Project not found");
-    }
-    const t = await db.task.create({
-      data: { ownerId: ctx.ownerId, title: input.title.slice(0, 200), projectId: input.projectId, priority: input.priority ?? "medium", agentId: ctx.agentId },
-    });
-    return { id: t.id, title: t.title };
-  },
-};
-
-const updateTaskTool: AgentTool<{ taskId: string; status?: string; title?: string }, { id: string; status: string }> = {
-  name: "update_task",
-  description: "Update own task (approval-gated)",
-  risk: "workspace_write",
-  inputSchema: z.object({
-    taskId: z.string().min(1),
-    status: z.enum(["todo", "in_progress", "completed", "cancelled"]).optional(),
-    title: z.string().min(1).max(200).optional(),
-  }),
-  execute: async (input, ctx) => {
-    const existing = await db.task.findFirst({ where: { id: input.taskId, ownerId: ctx.ownerId } });
-    if (!existing) throw new Error("Task not found");
-    const updated = await db.task.update({
-      where: { id: input.taskId },
-      data: {
-        ...(input.title ? { title: input.title.slice(0, 200) } : {}),
-        ...(input.status ? { status: input.status, completedAt: input.status === "completed" ? new Date() : null } : {}),
-      },
-    });
-    return { id: updated.id, status: updated.status };
   },
 };
 

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { ADAPTERS } from "@/lib/integrations/mcp-client";
+import { handleApi, HttpError, invalid } from "@/lib/api";
 
 const bodySchema = z.object({
   capability: z.string().min(1).max(80),
@@ -11,24 +11,22 @@ const bodySchema = z.object({
   requiresExternalWrite: z.boolean().optional(),
 });
 
-export async function POST(req: Request, { params }: { params: Promise<{ provider: string }> }) {
-  const { provider } = await params;
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const POST = handleApi<{ provider: string }>(async (req, { userId }, params) => {
+  const { provider } = params;
   const adapter = ADAPTERS[provider.toLowerCase()];
-  if (!adapter) return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+  if (!adapter) throw new HttpError("UNKNOWN_PROVIDER", 400, "Unknown provider");
   const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) throw invalid("Invalid input");
   if (parsed.data.requiresExternalWrite && parsed.data.approvalId) {
-    const ap = await db.approval.findFirst({ where: { id: parsed.data.approvalId, ownerId: u.id, status: "approved" } });
-    if (!ap) return NextResponse.json({ error: "Valid approved approval required" }, { status: 403 });
+    const ap = await db.approval.findFirst({ where: { id: parsed.data.approvalId, ownerId: userId, status: "approved" } });
+    if (!ap) throw new HttpError("APPROVAL_REQUIRED", 403, "Valid approved approval required");
   }
   const result = await adapter.execute(
     { capability: parsed.data.capability, input: parsed.data.input, requiresExternalWrite: parsed.data.requiresExternalWrite },
-    { ownerId: u.id, approvalId: parsed.data.approvalId }
+    { ownerId: userId, approvalId: parsed.data.approvalId }
   );
-  if (!result.ok) return NextResponse.json({ error: result.error ?? "Integration failed" }, { status: 400 });
+  if (!result.ok) throw new HttpError("INTEGRATION_FAILED", 400, result.error ?? "Integration failed");
   return NextResponse.json({ result: result.data });
-}
+}, {
+  rateLimit: { keyPrefix: "integration", limit: 20 },
+});

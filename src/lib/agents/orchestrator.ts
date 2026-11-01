@@ -14,6 +14,8 @@ import type { AgentRunRequest, AgentRunStatus } from "./types";
 
 async function setRunStatus(runId: string, from: AgentRunStatus, to: AgentRunStatus, extra: Record<string, unknown> = {}) {
   assertRunTransition(from, to);
+  const { logInfo } = await import("@/lib/observability/logger");
+  logInfo("run.transition", { runId, from, to });
   return db.agentRun.update({ where: { id: runId }, data: { status: to, ...extra } });
 }
 
@@ -52,7 +54,15 @@ export async function createRun(ownerId: string, req: AgentRunRequest) {
 export async function planRun(runId: string, ownerId: string) {
   const run = await db.agentRun.findFirst({ where: { id: runId, ownerId } });
   if (!run) throw new Error("Run not found");
-  await setRunStatus(runId, run.status as AgentRunStatus, "planning", { startedAt: run.startedAt ?? new Date() });
+  // Idempotent: never duplicate steps if planning retried or resumed.
+  const existingSteps = await db.agentStep.findMany({ where: { runId }, orderBy: { sequence: "asc" } });
+  if (existingSteps.length > 0) return existingSteps;
+  // executeRun may already have moved queued → planning; tolerate that.
+  if ((run.status as AgentRunStatus) === "queued") {
+    await setRunStatus(runId, "queued", "planning", { startedAt: run.startedAt ?? new Date() });
+  } else if ((run.status as AgentRunStatus) !== "planning") {
+    assertRunTransition(run.status as AgentRunStatus, "planning");
+  }
   const steps = buildPlan(run.goal);
   await db.agentStep.createMany({
     data: steps.map((s, i) => ({
@@ -87,10 +97,33 @@ export async function executeRun(runId: string, ownerId: string) {
   if (!run) throw new Error("Run not found");
   if (run.status === "planning") await planRun(runId, ownerId);
   const fresh = await db.agentRun.findUniqueOrThrow({ where: { id: runId } });
-  if (fresh.status === "awaiting_approval") return fresh;
-  if (fresh.status === "queued") {
-    await setRunStatus(runId, "queued", "planning");
+  if (fresh.status === "awaiting_approval") {
+    // Only pause when an approval actually exists. Otherwise the run was
+    // marked awaiting_approval by planning but no approval was materialized
+    // yet — continue so the tool step creates exactly one.
+    const pending = await db.approval.findFirst({ where: { runId, status: "pending" } });
+    if (pending) return fresh;
+    await setRunStatus(runId, "awaiting_approval", "running");
+  }
+  if (fresh.status === "queued" || fresh.status === "planning") {
+    if (fresh.status === "queued") await setRunStatus(runId, "queued", "planning");
     await planRun(runId, ownerId);
+    // planRun transitions planning → running|awaiting_approval when it creates
+    // steps; when steps already existed it returns early, so apply the same
+    // rule here to avoid stranding the run in planning.
+    const afterPlan = await db.agentRun.findUniqueOrThrow({ where: { id: runId } });
+    if (afterPlan.status === "planning") {
+      const steps = await db.agentStep.findMany({ where: { runId } });
+      const openApproval = steps.some((s) => s.requiresApproval && ["queued", "awaiting_approval", "running"].includes(s.status));
+      await setRunStatus(runId, "planning", openApproval ? "awaiting_approval" : "running");
+    }
+    // planRun may have set awaiting_approval preemptively; materialize the
+    // approval row by continuing into the step loop below.
+    const afterPlan2 = await db.agentRun.findUniqueOrThrow({ where: { id: runId } });
+    if (afterPlan2.status === "awaiting_approval") {
+      const pending = await db.approval.findFirst({ where: { runId, status: "pending" } });
+      if (!pending) await setRunStatus(runId, "awaiting_approval", "running");
+    }
   }
   const active = await db.agentRun.findUniqueOrThrow({ where: { id: runId } });
   if (active.status !== "running" && active.status !== "awaiting_approval") return active;
@@ -178,19 +211,29 @@ export async function cancelRun(runId: string, ownerId: string) {
   const run = await db.agentRun.findFirst({ where: { id: runId, ownerId } });
   if (!run) throw new Error("Run not found");
   assertRunTransition(run.status as AgentRunStatus, "cancelled");
-  return db.agentRun.update({ where: { id: runId }, data: { status: "cancelled", cancelledAt: new Date() } });
+  const cancelled = await db.agentRun.update({ where: { id: runId }, data: { status: "cancelled", cancelledAt: new Date() } });
+  await audit(ownerId, "agent_run_cancelled", { runId });
+  return cancelled;
 }
 
 export async function resumeRun(runId: string, ownerId: string) {
   const run = await db.agentRun.findFirst({ where: { id: runId, ownerId }, include: { steps: true } });
   if (!run) throw new Error("Run not found");
+  if (run.status === "completed") throw new Error("Run already completed.");
+  if (run.status === "cancelled") throw new Error("Run was cancelled.");
   const pending = await db.approval.findFirst({ where: { runId, ownerId, status: "pending" } });
   if (pending) throw new Error("Approval still pending");
-  if (run.status === "awaiting_approval" || run.status === "paused") {
-    await db.agentRun.update({ where: { id: runId }, data: { status: "running" } });
+  if (run.status === "awaiting_approval" || run.status === "paused" || run.status === "running") {
+    if (run.status !== "running") {
+      assertRunTransition(run.status as AgentRunStatus, "running");
+      await db.agentRun.update({ where: { id: runId }, data: { status: "running" } });
+    }
     return executeRun(runId, ownerId);
   }
   if (run.status === "failed") {
+    // Requeue without duplicating completed steps: planRun is idempotent
+    // and executeRun skips completed/skipped steps.
+    assertRunTransition(run.status as AgentRunStatus, "queued");
     await db.agentRun.update({ where: { id: runId }, data: { status: "queued", errorMessage: null } });
     return executeRun(runId, ownerId);
   }

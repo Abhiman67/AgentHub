@@ -25,20 +25,27 @@ export default function UsagePage() {
     const res = await fetch("/api/subscription/portal", { method: "POST" }); const d = await res.json();
     if (res.ok && d.url) window.location.assign(d.url); else setMsg(d.error ?? "Billing portal unavailable.");
   }
-  if (error) return <main className="mx-auto max-w-md p-8 text-center"><h1>Usage unavailable</h1><p className="mt-2 text-sm text-muted">{error}</p><button className="button primary mt-4" onClick={load}>Retry</button></main>;
+  if (error) return <main className="mx-auto max-w-md p-8 text-center"><h1>Usage unavailable</h1><p className="mt-2 text-sm text-muted">{error}</p><button className="button primary sm mt-4" onClick={load}>Retry</button></main>;
   if (!usage) return <main className="p-8">Loading usage…</main>;
   return (
     <main className="mx-auto max-w-3xl px-5 py-8">
-      <h1 className="text-3xl font-extrabold">Usage and plan</h1>
-      <div className="mt-4 rounded-3xl border border-line bg-card p-6">
+      <div className="page-head">
+        <div>
+          <h1>Usage and plan</h1>
+          <p>Transparent limits, no surprises.</p>
+        </div>
+      </div>
+      <div className="card">
         <p className="font-bold">{usage.plan}</p>
-        <p className="text-sm text-muted">{usage.renewal} · Transparent limits, no surprises.</p>
+        <p className="text-sm text-muted">{usage.renewal}</p>
         <p className="mt-3 text-sm">Agents: {usage.agents} ({usage.limits?.agents})</p>
         <p className="text-sm">Assistant messages: {usage.conversations} / {usage.limits?.messages?.limit ?? "—"}</p>
         <p className="text-sm">Files: {usage.files} / {usage.limits?.files?.limit ?? "—"}</p>
         <p className="text-sm">Approvals accepted: {usage.byType?.approval_accepted ?? 0} · denied: {usage.byType?.approval_denied ?? 0}</p>
-        <button onClick={upgrade} className="mt-4 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white">Upgrade / checkout</button>
-        <button onClick={manageBilling} className="mt-4 ml-2 rounded-full border border-line px-5 py-2.5 text-sm font-bold">Manage billing</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+          <button onClick={upgrade} className="button primary sm">Upgrade / checkout</button>
+          <button onClick={manageBilling} className="button secondary sm">Manage billing</button>
+        </div>
         {msg && <p className="mt-2 text-sm text-muted">{msg}</p>}
       </div>
     </main>

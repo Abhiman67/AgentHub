@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { logError, logInfo } from "@/lib/observability/logger";
 import { MAX_EXECUTION_MS, backoffMs, type Job, type JobHandler, type JobType } from "./types";
+import { getJobMode } from "./redis";
 
 const handlers = new Map<JobType, JobHandler<Record<string, unknown>>>();
 const cancelled = new Set<string>();
@@ -28,6 +29,18 @@ async function runWithTimeout<T>(type: JobType, fn: () => Promise<T>): Promise<T
   }
 }
 
+/**
+ * Runs the registered handler with timeout + cancellation.
+ * Shared by inline execution and the Redis worker. Throws on failure
+ * so callers record retry/dead-letter state; never swallows errors.
+ */
+export async function runHandler(job: Job<Record<string, unknown>>): Promise<void> {
+  const handler = handlers.get(job.type);
+  if (!handler) throw new Error(`No handler for job type ${job.type}`);
+  if (cancelled.has(job.idempotencyKey)) throw new Error("Job cancelled");
+  await runWithTimeout(job.type, () => handler(job));
+}
+
 export async function enqueue<T extends Record<string, unknown>>(
   type: JobType,
   payload: T,
@@ -43,9 +56,16 @@ export async function enqueue<T extends Record<string, unknown>>(
     create: { type, idempotencyKey: key, payload: JSON.stringify(payload).slice(0, 8000), status: "queued", maxRetries: opts.maxRetries ?? 3 },
     update: { type, payload: JSON.stringify(payload).slice(0, 8000), status: "queued", lastError: null },
   });
-  const job: Job<T> = { id: record.id, type, payload, idempotencyKey: key, retries: record.retries, maxRetries: record.maxRetries, createdAt: record.createdAt };
-
+  // Redis mode: persist + hand to BullMQ, report honestly as queued.
+  // executeInline:false only short-circuits in inline mode (tests).
+  if (getJobMode() === "redis") {
+    const { getBullQueue, bullOptions, bullJobId } = await import("./bull");
+    await getBullQueue().add(type, payload, { ...bullOptions(record.maxRetries), jobId: bullJobId(type, key) });
+    logInfo("job.queued", { type, key });
+    return { deduped: false, key, status: "queued" };
+  }
   if (opts.executeInline === false) return { deduped: false, key, status: "queued" };
+  const job: Job<T> = { id: record.id, type, payload, idempotencyKey: key, retries: record.retries, maxRetries: record.maxRetries, createdAt: record.createdAt };
   return processJob(job);
 }
 

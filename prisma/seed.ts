@@ -4,6 +4,11 @@ import { AGENT_TEMPLATES } from "../src/lib/agents";
 const db = new PrismaClient();
 
 async function main() {
+  await db.user.upsert({
+    where: { email: "system@backoff.local" },
+    create: { id: "system", name: "System", email: "system@backoff.local", passwordHash: "!" },
+    update: {},
+  });
   for (const t of AGENT_TEMPLATES) {
     // Global template agents use a stable ownerId so @@unique([ownerId, template]) seeds once.
     await db.agent.upsert({

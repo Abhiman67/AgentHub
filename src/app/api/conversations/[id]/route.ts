@@ -1,22 +1,19 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { streamAi, sseEncode, PLATFORM_SYSTEM_POLICY } from "@/lib/ai";
 import { trackUsage } from "@/lib/usage";
 import { rateLimitDistributed } from "@/lib/rate-limit";
 import { getQuota } from "@/lib/quotas";
 import { chunkText, findRelevantChunks, type TextChunk } from "@/lib/chunking";
+import { handleApi, HttpError, invalid, notFound } from "@/lib/api";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
+export const GET = handleApi<{ id: string }>(async (req, { userId }, params) => {
+  const { id } = params;
   const url = new URL(req.url);
   const take = Math.min(Math.max(Number(url.searchParams.get("take") || 200), 1), 200);
   const cursor = url.searchParams.get("cursor");
   const conv = await db.conversation.findFirst({
-    where: { id, userId: u?.id },
+    where: { id, userId },
     include: {
       messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: take + 1, ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}) },
       agent: {
@@ -32,23 +29,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       },
     },
   });
-  if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!conv) throw notFound("Conversation");
   const hasMore = conv.messages.length > take;
   if (hasMore) conv.messages.pop();
   return NextResponse.json({ conversation: conv, nextCursor: hasMore ? conv.messages.at(-1)?.id ?? null : null });
-}
+});
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  const conv = await db.conversation.findFirst({ where: { id, userId: u?.id } });
-  if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const PATCH = handleApi<{ id: string }>(async (req, { userId }, params) => {
+  const { id } = params;
+  const conv = await db.conversation.findFirst({ where: { id, userId } });
+  if (!conv) throw notFound("Conversation");
   const { title, projectId } = await req.json();
   if (projectId) {
-    const p = await db.project.findFirst({ where: { id: projectId, ownerId: u?.id } });
-    if (!p) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    const p = await db.project.findFirst({ where: { id: projectId, ownerId: userId } });
+    if (!p) throw new HttpError("PROJECT_NOT_FOUND", 404, "Project not found");
   }
   const updated = await db.conversation.update({
     where: { id },
@@ -58,37 +52,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     },
   });
   return NextResponse.json({ conversation: updated });
-}
+});
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  const conv = await db.conversation.findFirst({ where: { id, userId: u?.id } });
-  if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const DELETE = handleApi<{ id: string }>(async (_, { userId }, params) => {
+  const { id } = params;
+  const conv = await db.conversation.findFirst({ where: { id, userId } });
+  if (!conv) throw notFound("Conversation");
   await db.conversation.delete({ where: { id } });
   return NextResponse.json({ ok: true });
-}
+});
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await rateLimitDistributed(`chat:${u.id}`, 30))) return NextResponse.json({ error: "Too many messages" }, { status: 429 });
-  const quota = await getQuota(u.id, "messages");
-  if (!quota.allowed) return NextResponse.json({ error: "Message quota exceeded", quota }, { status: 402 });
-  const conv = await db.conversation.findFirst({ where: { id, userId: u.id }, include: { agent: true } });
-  if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const POST = handleApi<{ id: string }>(async (req, { userId }, params) => {
+  const { id } = params;
+  if (!(await rateLimitDistributed(`chat:${userId}`, 30))) throw new HttpError("RATE_LIMITED", 429, "Too many messages");
+  const quota = await getQuota(userId, "messages");
+  if (!quota.allowed) throw new HttpError("QUOTA_EXCEEDED", 402, "Message quota exceeded", false, { quota });
+  const conv = await db.conversation.findFirst({ where: { id, userId }, include: { agent: true } });
+  if (!conv) throw notFound("Conversation");
   const { message } = await req.json();
-  if (!message || typeof message !== "string" || !message.trim()) return NextResponse.json({ error: "Empty message" }, { status: 400 });
-  if (message.length > 4000) return NextResponse.json({ error: "Message too long" }, { status: 400 });
+  if (!message || typeof message !== "string" || !message.trim()) throw invalid("Empty message");
+  if (message.length > 4000) throw invalid("Message too long");
 
   await db.message.create({ data: { conversationId: id, role: "user", content: message.slice(0, 4000) } });
   const history = await db.message.findMany({ where: { conversationId: id }, orderBy: { createdAt: "asc" }, take: 20 });
-  const allFiles = await db.file.findMany({ where: { ownerId: u.id, status: "ready" }, take: 15 });
+  const allFiles = await db.file.findMany({ where: { ownerId: userId, status: "ready" }, take: 15 });
 
   // Semantic RAG Chunking: extract chunks across user's notes and rank by relevance to query
   const allChunks: (TextChunk & { fileId: string; fileName: string })[] = [];
@@ -111,7 +98,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   let projectCtx = "";
   if (conv.projectId) {
-    const proj = await db.project.findFirst({ where: { id: conv.projectId, ownerId: u.id }, include: { tasks: { take: 10 } } });
+    const proj = await db.project.findFirst({ where: { id: conv.projectId, ownerId: userId }, include: { tasks: { take: 10 } } });
     if (proj) projectCtx = `\nActive project: ${proj.name} (${proj.status}). Tasks: ${proj.tasks.map((t) => `${t.title}[${t.status}]`).join("; ").slice(0, 500)}`;
   }
 
@@ -136,7 +123,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           if (e.type === "approval_required") {
             const approval = await db.approval.create({
               data: {
-                ownerId: u.id,
+                ownerId: userId,
                 agentId: conv.agentId,
                 title: `Approve: ${message.slice(0, 80)}`,
                 description: e.description,
@@ -150,7 +137,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
         const saved = await db.message.create({ data: { conversationId: id, role: "assistant", content: full } });
         controller.enqueue(enc.encode(sseEncode({ type: "done", messageId: saved.id })));
-        await trackUsage(u.id, "message");
+        await trackUsage(userId, "message");
       } catch {
         controller.enqueue(enc.encode(sseEncode({ type: "error", message: "AI failed. Retry." })));
       }
@@ -158,4 +145,4 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
-}
+});

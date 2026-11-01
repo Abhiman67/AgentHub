@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { handleApi, notFound } from "@/lib/api";
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  const file = await db.file.findFirst({ where: { id, ownerId: u?.id }, select: { id: true, status: true, name: true } });
-  if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const GET = handleApi<{ id: string }>(async (_req, { userId }, params) => {
+  const { id } = params;
+  const file = await db.file.findFirst({ where: { id, ownerId: userId }, select: { id: true, status: true, name: true } });
+  if (!file) throw notFound("File");
   return NextResponse.json(file);
-}
+});

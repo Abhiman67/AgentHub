@@ -91,8 +91,9 @@ export async function buildBoundedContext(input: RunContextInput): Promise<Bound
   };
 }
 
-function safeJson(raw: string | null | undefined): unknown {
-  if (!raw) return [];
+function safeJson(raw: unknown): unknown {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== "string" || !raw) return [];
   try {
     return JSON.parse(raw);
   } catch {

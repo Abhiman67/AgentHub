@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/Dialog";
 
@@ -41,24 +41,26 @@ function FlashcardDeck({ cards }: { cards: { q: string; a: string }[] }) {
         </span>
         <div style={{ display: "flex", gap: 6 }}>
           <button
+            type="button"
             onClick={() => {
               setFlipped(false);
               setIndex((i) => (i > 0 ? i - 1 : cards.length - 1));
             }}
             className="tag"
-            style={{ cursor: "pointer", border: 0 }}
+            aria-label="Previous flashcard"
           >
-            ← Prev
+            Prev
           </button>
           <button
+            type="button"
             onClick={() => {
               setFlipped(false);
               setIndex((i) => (i < cards.length - 1 ? i + 1 : 0));
             }}
             className="tag"
-            style={{ cursor: "pointer", border: 0 }}
+            aria-label="Next flashcard"
           >
-            Next →
+            Next
           </button>
         </div>
       </div>
@@ -66,8 +68,8 @@ function FlashcardDeck({ cards }: { cards: { q: string; a: string }[] }) {
         onClick={() => setFlipped(!flipped)}
         style={{
           minHeight: 110,
-          background: flipped ? "#f5fbf3" : "var(--color-paper)",
-          border: flipped ? "1px solid #c0e3ba" : "1px solid var(--color-line)",
+          background: "var(--color-paper)",
+          border: "1px solid var(--color-line)",
           borderRadius: 14,
           padding: 16,
           display: "flex",
@@ -76,7 +78,6 @@ function FlashcardDeck({ cards }: { cards: { q: string; a: string }[] }) {
           alignItems: "center",
           cursor: "pointer",
           textAlign: "center",
-          transition: "all 0.2s ease",
         }}
       >
         <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-muted)", marginBottom: 6 }}>
@@ -100,30 +101,32 @@ function QuizDeck({ questions }: { questions: { q: string; hint?: string; answer
         <div key={i} className="rounded-2xl border border-line bg-card p-4">
           <p style={{ fontWeight: 700, fontSize: 13, margin: 0 }}>{q.q}</p>
           {hints[i] && q.hint && (
-            <p style={{ fontSize: 12, color: "#a06000", background: "#fff9eb", padding: 8, borderRadius: 8, marginTop: 8 }}>
-              💡 Hint: {q.hint}
+            <p style={{ fontSize: 12, background: "var(--color-paper)", border: "1px solid var(--color-line)", padding: 8, borderRadius: 8, marginTop: 8 }}>
+              Hint: {q.hint}
             </p>
           )}
           {revealed[i] && q.answer && (
-            <p style={{ fontSize: 12, color: "#1e6022", background: "#f0f8ed", padding: 8, borderRadius: 8, marginTop: 8 }}>
-              ✓ Answer: {q.answer}
+            <p style={{ fontSize: 12, background: "var(--color-paper)", border: "1px solid var(--color-line)", padding: 8, borderRadius: 8, marginTop: 8 }}>
+              Answer: {q.answer}
             </p>
           )}
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
             {q.hint && (
               <button
+                type="button"
                 onClick={() => setHints((h) => ({ ...h, [i]: !h[i] }))}
                 className="tag"
-                style={{ cursor: "pointer", border: 0, fontSize: 11 }}
+                aria-pressed={Boolean(hints[i])}
               >
                 {hints[i] ? "Hide hint" : "Hint"}
               </button>
             )}
             {q.answer && (
               <button
+                type="button"
                 onClick={() => setRevealed((r) => ({ ...r, [i]: !r[i] }))}
                 className="tag"
-                style={{ cursor: "pointer", border: 0, fontSize: 11, background: revealed[i] ? "var(--color-line)" : "var(--color-brand)", color: revealed[i] ? "inherit" : "white" }}
+                aria-pressed={Boolean(revealed[i])}
               >
                 {revealed[i] ? "Hide answer" : "Show answer"}
               </button>
@@ -138,28 +141,64 @@ function QuizDeck({ questions }: { questions: { q: string; hint?: string; answer
 export default function FilesPage() {
   const [files, setFiles] = useState<FileRow[]>([]);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [openPreview, setOpenPreview] = useState<string | null>(null);
   const [activeStudy, setActiveStudy] = useState<Record<string, string | null>>({});
   const [studyData, setStudyData] = useState<Record<string, StudyData>>({});
   const [fileToDelete, setFileToDelete] = useState<FileRow | null>(null);
   const [deletingFile, setDeletingFile] = useState(false);
+  const [loadingFiles, setLoadingFiles] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [draggingFile, setDraggingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const load = () => fetch("/api/files").then((r) => r.json()).then((d) => setFiles(d.files ?? []));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch("/api/files");
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : data.error?.message ?? "Could not load your files.");
+      setFiles(data.files ?? []);
+      setLoadError("");
+    } catch {
+      setLoadError("We couldn't load your files.");
+    } finally {
+      setLoadingFiles(false);
+    }
+  }, []);
 
-  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function uploadFile(f?: File) {
     if (!f) return;
     setError("");
+    setUploading(true);
     const fd = new FormData();
     fd.append("file", f);
-    const res = await fetch("/api/files", { method: "POST", body: fd });
-    if (!res.ok) {
-      const d = await res.json();
-      setError(d.error ?? "Upload failed. Your data is safe.");
+    try {
+      const res = await fetch("/api/files", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : data.error?.message ?? "Upload failed. Please try again.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    load();
+  }
+
+  function upload(e: React.ChangeEvent<HTMLInputElement>) {
+    void uploadFile(e.target.files?.[0]);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLElement>) {
+    e.preventDefault();
+    setDraggingFile(false);
+    void uploadFile(e.dataTransfer.files?.[0]);
   }
 
   async function handleConfirmDelete() {
@@ -208,35 +247,47 @@ export default function FilesPage() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head files-page-head">
         <div>
           <h1>Files & notes</h1>
-          <p>Give your agents the context they need to help you better.</p>
+          <p>Keep your study materials together and give your agents useful context.</p>
         </div>
-        <label className="button" style={{ cursor: "pointer" }}>
-          ↥ Upload files
-          <input type="file" hidden onChange={upload} accept=".pdf,.txt,.md,.docx" aria-label="Upload study file" />
-        </label>
+        <button type="button" className="button primary sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+          {uploading ? "Uploading…" : "Upload a file"}
+        </button>
       </div>
 
-      <label className="panel dropzone" style={{ display: "block", cursor: "pointer" }}>
-        <div className="big">↥</div>
-        <h2>Drop your notes here</h2>
-        <p>PDF, TXT, MD and DOCX files up to 10 MB.</p>
-        <input type="file" hidden onChange={upload} accept=".pdf,.txt,.md,.docx" aria-label="Browse files" />
-        <span className="button light" style={{ display: "inline-flex" }}>Browse files</span>
-      </label>
+      <input ref={fileInputRef} className="file-input-hidden" type="file" onChange={upload} accept=".pdf,.txt,.md,.docx" aria-label="Choose a study file to upload" />
 
-      {error && <p className="mt-2 text-sm" role="alert" style={{ color: "#c0392b" }}>{error}</p>}
+      <section
+        className={`files-dropzone${draggingFile ? " is-over" : ""}${uploading ? " is-uploading" : ""}`}
+        aria-label="Upload study materials"
+        onDragEnter={(e) => { e.preventDefault(); setDraggingFile(true); }}
+        onDragOver={(e) => { e.preventDefault(); setDraggingFile(true); }}
+        onDragLeave={(e) => { e.preventDefault(); if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDraggingFile(false); }}
+        onDrop={handleDrop}
+      >
+        <div className="files-dropzone-icon" aria-hidden="true">↥</div>
+        <h2>{uploading ? "Uploading your file…" : draggingFile ? "Drop to upload" : "Add notes and study materials"}</h2>
+        <p>{uploading ? "Keep this page open while we add it to your workspace." : "Drag a file here, or choose one from your device."}</p>
+        <button type="button" className="button secondary sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+          Browse files
+        </button>
+        <span className="files-dropzone-meta">PDF, TXT, MD or DOCX <span aria-hidden="true">·</span> up to 10 MB</span>
+      </section>
 
-      <section className="panel" style={{ marginTop: 18 }}>
+      {error && <p className="files-error" role="alert">{error}</p>}
+
+      <section className="panel files-list-panel">
         <div className="panel-head">
           <h2>Recent files</h2>
           <span className="tag">{files.length} files</span>
         </div>
-        {files.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No files yet. Upload notes and ask Study Coach.</p>}
+        {loadingFiles && <p className="files-list-message">Loading your files…</p>}
+        {!loadingFiles && loadError && <div className="files-list-message"><span>{loadError}</span><button type="button" className="files-retry" onClick={() => void load()}>Try again</button></div>}
+        {!loadingFiles && !loadError && files.length === 0 && <div className="files-empty-state"><strong>No files yet</strong><span>Your uploaded notes and study materials will show up here.</span></div>}
 
-        {files.map((f) => {
+        {!loadError && files.map((f) => {
           const [label, color] = ext(f.name);
           const activeAction = activeStudy[f.id];
           const currentStudy = activeAction ? studyData[f.id + ":" + activeAction] : undefined;
@@ -249,14 +300,15 @@ export default function FilesPage() {
                   <b>{f.name}</b>
                   <small>{fmt(f.size)} · {f.status}</small>
                 </div>
-                <span className="status">● {f.status}</span>
+                <span className="tag">{f.status}</span>
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7, paddingLeft: 46 }}>
                 <button
+                  type="button"
                   onClick={() => togglePreview(f.id)}
                   className="tag"
-                  style={{ cursor: "pointer", border: 0, background: openPreview === f.id ? "var(--color-line)" : undefined }}
+                  aria-pressed={openPreview === f.id}
                 >
                   {openPreview === f.id ? "Close preview" : "Preview"}
                 </button>
@@ -267,26 +319,20 @@ export default function FilesPage() {
                 ].map(([a, l]) => (
                   <button
                     key={a}
+                    type="button"
                     onClick={() => toggleStudy(f.id, a)}
                     className="tag"
-                    style={{
-                      cursor: "pointer",
-                      border: 0,
-                      background: activeAction === a ? "var(--color-brand)" : undefined,
-                      color: activeAction === a ? "white" : undefined,
-                      fontWeight: activeAction === a ? 700 : 600,
-                    }}
+                    aria-pressed={activeAction === a}
                   >
                     {l}
                   </button>
                 ))}
-                <Link href="/app/agents" className="tag" style={{ textDecoration: "none" }}>Ask →</Link>
+                <Link href="/app/agents" className="tag" style={{ textDecoration: "none" }}>Ask</Link>
                 <button
                   type="button"
                   onClick={() => setFileToDelete(f)}
                   aria-label={`Delete ${f.name}`}
-                  className="tag"
-                  style={{ cursor: "pointer", border: 0, color: "#c0392b" }}
+                  className="link-danger"
                 >
                   Delete
                 </button>

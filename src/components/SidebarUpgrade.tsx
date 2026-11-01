@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const COOKIE_NAME = "agenthub_upgrade_dismissed";
+const COOKIE_NAME = "backoff_upgrade_dismissed";
 
 export default function SidebarUpgrade({
   initialDismissed = false,
@@ -53,7 +53,7 @@ export default function SidebarUpgrade({
     return (
       <div className="upgrade-card-collapsed">
         <Link href="/pricing" className="upgrade-pill-btn">
-          <span>✦</span> Upgrade to Pro
+          <span>✦</span> Student Pro preview
         </Link>
         <button
           onClick={handleRestore}
@@ -71,7 +71,7 @@ export default function SidebarUpgrade({
     <div className="upgrade-card">
       <div className="upgrade-card-head">
         <div className="upgrade-badge">
-          <span>✦</span> Student Pro
+          <span>✦</span> Student Pro preview
         </div>
         <button
           onClick={handleDismiss}
@@ -82,10 +82,10 @@ export default function SidebarUpgrade({
           ×
         </button>
       </div>
-      <b className="upgrade-card-title">Unlock your full team</b>
-      <p className="upgrade-card-desc">Unlimited agents & smart multi-agent project workspaces.</p>
+      <b className="upgrade-card-title">More workspace power, later</b>
+      <p className="upgrade-card-desc">Student Pro is planned for a later release. Explore the product direction without entering payment details.</p>
       <Link href="/pricing" className="upgrade-card-btn">
-        See Student Pro →
+        See what&apos;s planned →
       </Link>
     </div>
   );

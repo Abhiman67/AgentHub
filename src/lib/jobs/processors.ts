@@ -109,4 +109,9 @@ registerHandler("agent.retry", async (job) => {
   await resumeRun(runId, ownerId);
 });
 
+registerHandler("responsibility.tick", async () => {
+  const { tickResponsibilities } = await import("@/lib/responsibilities");
+  await tickResponsibilities();
+});
+
 export {};

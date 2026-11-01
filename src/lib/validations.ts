@@ -43,6 +43,8 @@ export const projectUpdateSchema = z.object({
 export const taskCreateSchema = z.object({
   title: z.string().min(1).max(200),
   projectId: z.string().optional(),
+  subjectId: z.string().optional(),
+  milestoneId: z.string().min(1).optional(),
   dueDate: z.string().optional().refine((value) => !value || !Number.isNaN(Date.parse(value)), "Invalid due date"),
   priority: z.enum(["low", "medium", "high"]).optional(),
   agentId: z.string().optional(),
@@ -55,6 +57,8 @@ export const taskUpdateSchema = z.object({
   dueDate: z.string().nullable().optional().refine((value) => !value || !Number.isNaN(Date.parse(value)), "Invalid due date"),
   priority: z.enum(["low", "medium", "high"]).optional(),
   projectId: z.string().nullable().optional(),
+  subjectId: z.string().nullable().optional(),
+  milestoneId: z.string().nullable().optional(),
 });
 
 export const applicationCreateSchema = z.object({

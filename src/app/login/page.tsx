@@ -3,6 +3,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ScrollMotion from "@/components/ScrollMotion";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,10 +25,11 @@ export default function LoginPage() {
 
   return (
     <main className="wrap" style={{ padding: "60px 0" }}>
-      <div className="login-card">
+      <ScrollMotion />
+      <div className="login-card reveal in">
         <div className="eyebrow">Welcome back</div>
         <h2>Pick up where you left off.</h2>
-        <p>Sign in to your AgentHub workspace and get your team moving.</p>
+        <p>Sign in to your Backoff workspace and get your team moving.</p>
         <form onSubmit={onSubmit}>
           <label htmlFor="login-email">Email address</label>
           <input id="login-email" type="email" placeholder="you@university.edu" value={email} onChange={(e) => setEmail(e.target.value)} />

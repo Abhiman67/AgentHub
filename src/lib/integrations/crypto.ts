@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:
 
 function key(): Buffer {
   const secret = process.env.ENCRYPTION_KEY ?? process.env.AUTH_SECRET ?? "dev-only-encryption-key-change-me-32b";
-  return scryptSync(secret, "agenthub-oauth", 32);
+  return scryptSync(secret, "backoff-oauth", 32);
 }
 
 export function encryptToken(plain: string): string {

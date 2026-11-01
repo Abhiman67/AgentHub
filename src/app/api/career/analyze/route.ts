@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { handleApi } from "@/lib/api";
 
 const SKILLS = [
   "react", "next.js", "typescript", "javascript", "python", "java", "sql", "postgresql",
@@ -18,13 +18,9 @@ const ROLE_GAPS: Record<string, string[]> = {
   devops: ["git", "docker", "aws", "ci/cd", "node", "python", "sql", "testing"],
 };
 
-export async function POST(req: Request) {
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-
+export const POST = handleApi(async (req, { userId }) => {
   const { fileId, targetRole } = await req.json();
-  const file = fileId ? await db.file.findFirst({ where: { id: fileId, ownerId: u?.id } }) : null;
+  const file = fileId ? await db.file.findFirst({ where: { id: fileId, ownerId: userId } }) : null;
   const text = (file?.textContent ?? "").toLowerCase();
 
   const found = SKILLS.filter((k) => text.includes(k));
@@ -69,5 +65,4 @@ export async function POST(req: Request) {
       ? `Extracted and parsed from ${file.name}. Review and align with target job requirements.`
       : "Select your resume from Files & Notes for an instant ATS keyword audit.",
   });
-}
-
+});

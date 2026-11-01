@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { PauseAllRoutines } from "@/components/PauseAllRoutines";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -71,6 +72,15 @@ export default async function SettingsPage() {
       color: "peach",
       badge: "OAuth",
     },
+    {
+      title: "Background Routines",
+      desc: "Scheduled agent checks. Pause everything instantly, or manage each routine.",
+      href: "/app/responsibilities",
+      icon: "◔",
+      color: "green",
+      badge: "Routines",
+      action: "pause-all",
+    },
   ];
 
   return (
@@ -104,8 +114,8 @@ export default async function SettingsPage() {
               {user.email} · {taskCount} tasks · {fileCount} notes uploaded
             </p>
           </div>
-          <Link href="/app/settings/profile" className="button light" style={{ fontSize: 12, padding: "8px 14px" }}>
-            Edit Profile
+          <Link href="/app/settings/profile" className="button secondary sm">
+            Edit profile
           </Link>
         </div>
       )}
@@ -116,17 +126,13 @@ export default async function SettingsPage() {
 
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
         {cards.map((c) => (
-          <Link
+          <div
             key={c.href}
-            href={c.href}
             className="card"
             style={{
-              textDecoration: "none",
-              color: "inherit",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
-              transition: "transform 0.15s ease",
             }}
           >
             <div>
@@ -134,17 +140,20 @@ export default async function SettingsPage() {
                 <div className={`agent-icon ${c.color}`} style={{ margin: 0, fontSize: 17 }}>
                   {c.icon}
                 </div>
-                <span className="tag" style={{ fontSize: 11 }}>{c.badge}</span>
+                <span className="tag">{c.badge}</span>
               </div>
               <h3 style={{ fontSize: 16, margin: "0 0 6px" }}>{c.title}</h3>
               <p style={{ fontSize: 13, color: "var(--color-muted)", margin: 0, lineHeight: 1.5 }}>
                 {c.desc}
               </p>
             </div>
-            <div style={{ marginTop: 16, fontSize: 12, fontWeight: 750, color: "var(--color-brand)" }}>
-              Configure →
+            <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+              <Link href={c.href} className="button secondary sm">
+                Configure
+              </Link>
+              {"action" in c && c.action === "pause-all" && <PauseAllRoutines />}
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </div>

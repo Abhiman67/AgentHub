@@ -1,21 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { approvalCreateSchema } from "@/lib/validations";
-import { isExpired, expireStaleApprovals } from "@/lib/approvals";
+import { expireStaleApprovals } from "@/lib/approvals";
 import { getUserAuditLogs } from "@/lib/audit";
+import { handleApi, HttpError, invalid } from "@/lib/api";
 
-async function uid() {
-  const s = await auth();
-  if (!s?.user?.email) return null;
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  return u?.id ?? null;
-}
-
-export async function GET(req: Request) {
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export const GET = handleApi(async (req, { userId: id }) => {
   // 1. Automatically sweep stale approvals older than 7 days
   await expireStaleApprovals(id);
 
@@ -74,18 +64,16 @@ export async function GET(req: Request) {
     stats,
     auditLogs,
   });
-}
+});
 
-export async function POST(req: Request) {
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const POST = handleApi(async (req, { userId: id }) => {
   const parsed = approvalCreateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) throw invalid("Invalid input");
   const { agentId, title, description } = parsed.data;
   if (agentId) {
     const agent = await db.agent.findFirst({ where: { id: agentId, ownerId: id }, select: { id: true } });
-    if (!agent) return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    if (!agent) throw new HttpError("AGENT_NOT_FOUND", 404, "Agent not found");
   }
   const a = await db.approval.create({ data: { ownerId: id, agentId: agentId ?? "general", title, description: description ?? "" } });
   return NextResponse.json({ approval: a }, { status: 201 });
-}
+});

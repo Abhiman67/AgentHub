@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/Logo";
 import { cookies } from "next/headers";
 import { auth, signOut } from "@/auth";
 import Topbar from "./Topbar";
@@ -17,14 +18,14 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const tag = initials(session?.user?.name, email);
 
   const cookieStore = await cookies();
-  const initialDismissed = cookieStore.get("agenthub_upgrade_dismissed")?.value === "true";
+  const initialDismissed = cookieStore.get("backoff_upgrade_dismissed")?.value === "true";
 
   return (
     <div className="dash-layout">
       <aside className="sidebar">
         <div className="sidebar-main">
           <Link href="/" className="brand">
-            <span className="logo">✦</span> agenthub
+            <LogoMark /> Backoff
           </Link>
           <div className="label">Workspace</div>
           <SideNav />

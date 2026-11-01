@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { applicationCreateSchema, applicationUpdateSchema } from "@/lib/validations";
+import { handleApi, invalid, notFound } from "@/lib/api";
 
-async function uid() {
-  const s = await auth();
-  if (!s?.user?.email) return null;
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  return u?.id ?? null;
-}
-
-export async function GET(req: Request) {
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const GET = handleApi(async (req, { userId: id }) => {
   const url = new URL(req.url);
   const take = Math.min(Math.max(Number(url.searchParams.get("take") || 50), 1), 100);
   const cursor = url.searchParams.get("cursor");
@@ -20,40 +11,34 @@ export async function GET(req: Request) {
   const hasMore = apps.length > take;
   if (hasMore) apps.pop();
   return NextResponse.json({ applications: apps, nextCursor: hasMore ? apps.at(-1)?.id ?? null : null });
-}
+});
 
-export async function POST(req: Request) {
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const POST = handleApi(async (req, { userId: id }) => {
   const parsed = applicationCreateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Company and role required" }, { status: 400 });
+  if (!parsed.success) throw invalid("Company and role required");
   const { company, role, url, status, notes } = parsed.data;
   const app = await db.application.create({
     data: { ownerId: id, company, role, url: url ?? "", status: status ?? "saved", notes: notes ?? "" },
   });
   return NextResponse.json({ application: app }, { status: 201 });
-}
+});
 
-export async function PATCH(req: Request) {
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const PATCH = handleApi(async (req, { userId: id }) => {
   const parsed = applicationUpdateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Invalid application update" }, { status: 400 });
+  if (!parsed.success) throw invalid("Invalid application update");
   const { id: appId, status, notes } = parsed.data;
   const existing = await db.application.findFirst({ where: { id: appId, ownerId: id } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) throw notFound("Application");
   const app = await db.application.update({ where: { id: appId }, data: { ...(status ? { status } : {}), ...(notes !== undefined ? { notes } : {}) } });
   return NextResponse.json({ application: app });
-}
+});
 
-export async function DELETE(req: Request) {
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const DELETE = handleApi(async (req, { userId: id }) => {
   const { searchParams } = new URL(req.url);
   const appId = searchParams.get("id");
-  if (!appId) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!appId) throw invalid("id required");
   const existing = await db.application.findFirst({ where: { id: appId, ownerId: id } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) throw notFound("Application");
   await db.application.delete({ where: { id: appId } });
   return NextResponse.json({ ok: true });
-}
+});

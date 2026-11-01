@@ -8,12 +8,12 @@ datasource db {
 }
 
 model User {
-  id                  String               @id @default(cuid())
+  id                  String                @id @default(cuid())
   name                String
-  email               String               @unique
+  email               String                @unique
   passwordHash        String
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
   profile             Profile?
   agents              Agent[]
   projects            Project[]
@@ -32,6 +32,19 @@ model User {
   fileChunks          FileChunk[]
   integrationAccounts IntegrationAccount[]
   jobRecords          JobRecord[]
+  recommendations     Recommendation[]
+  subjects            Subject[]
+  topics              Topic[]
+  outcomes            LearningOutcome[]
+  revisionSessions    RevisionSession[]
+  milestones          Milestone[]
+  projectRisks        ProjectRisk[]
+  careerGoals         CareerGoal[]
+  noteLinks           NoteLink[]
+  noteRevisions       NoteRevision[]
+  responsibilities    AgentResponsibility[]
+  notifications       Notification[]
+  masteryEvidence     MasteryEvidence[]
 }
 
 model Profile {
@@ -41,10 +54,10 @@ model Profile {
   institution    String?
   degree         String?
   semester       String?
-  goals          String   @default("[]")
-  subjects       String   @default("[]")
-  skills         String   @default("[]")
-  interests      String   @default("[]")
+  goals          Json     @default("[]")
+  subjects       Json     @default("[]")
+  skills         Json     @default("[]")
+  interests      Json     @default("[]")
   studyHours     Int?
   careerTarget   String?
   onboardingDone Boolean  @default(false)
@@ -52,19 +65,20 @@ model Profile {
 }
 
 model Agent {
-  id            String         @id @default(cuid())
-  ownerId       String?
-  owner         User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  template      String
-  name          String
-  role          String
-  description   String
-  icon          String         @default("sparkles")
-  category      String
-  systemPrompt  String
-  createdAt     DateTime       @default(now())
-  conversations Conversation[]
-  runs          AgentRun[]
+  id               String                @id @default(cuid())
+  ownerId          String?
+  owner            User?                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  template         String
+  name             String
+  role             String
+  description      String
+  icon             String                @default("sparkles")
+  category         String
+  systemPrompt     String
+  createdAt        DateTime              @default(now())
+  conversations    Conversation[]
+  runs             AgentRun[]
+  responsibilities AgentResponsibility[]
 
   @@unique([ownerId, template])
 }
@@ -108,32 +122,41 @@ model Project {
   type           String         @default("major")
   status         String         @default("active")
   targetDate     DateTime?
-  linkedAgentIds String         @default("[]")
-  members        String         @default("[]")
+  linkedAgentIds Json           @default("[]")
+  members        Json           @default("[]")
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   tasks          Task[]
   conversations  Conversation[]
   agentRuns      AgentRun[]
+  milestones     Milestone[]
+  risks          ProjectRisk[]
+  files          File[]
 
   @@index([ownerId])
 }
 
 model Task {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   ownerId     String
-  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  subjectId   String?
+  subject     Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   title       String
   dueDate     DateTime?
-  priority    String    @default("medium")
-  status      String    @default("todo")
+  priority    String     @default("medium")
+  status      String     @default("todo")
   agentId     String?
-  createdAt   DateTime  @default(now())
+  milestoneId String?
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
   completedAt DateTime?
 
   @@index([projectId, status, dueDate])
+  @@index([subjectId, status, dueDate])
+  @@index([milestoneId])
 }
 
 model File {
@@ -147,10 +170,51 @@ model File {
   textContent   String      @default("")
   storageKey    String?
   failureReason String?
+  subjectId     String?
+  subject       Subject?    @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  projectId     String?
+  project       Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  careerGoalId  String?
+  careerGoal    CareerGoal? @relation(fields: [careerGoalId], references: [id], onDelete: SetNull)
+  folder        String      @default("Inbox")
+  tags          Json        @default("[]")
   createdAt     DateTime    @default(now())
   chunks        FileChunk[]
+  outgoingLinks NoteLink[]  @relation("NoteLinkFrom")
+  incomingLinks NoteLink[]  @relation("NoteLinkTo")
+  revisions     NoteRevision[]
 
   @@index([ownerId, status])
+  @@index([ownerId, projectId])
+  @@index([ownerId, careerGoalId])
+}
+
+model NoteLink {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  fromId    String
+  from      File     @relation("NoteLinkFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId      String
+  to        File     @relation("NoteLinkTo", fields: [toId], references: [id], onDelete: Cascade)
+  label     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId])
+  @@index([ownerId, toId])
+}
+
+model NoteRevision {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  fileId    String
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([ownerId, fileId, createdAt])
 }
 
 model FileChunk {
@@ -172,7 +236,7 @@ model IntegrationAccount {
   ownerId               String
   owner                 User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   provider              String
-  scopes                String    @default("[]")
+  scopes                Json      @default("[]")
   accessTokenEncrypted  String?
   refreshTokenEncrypted String?
   expiresAt             DateTime?
@@ -199,6 +263,193 @@ model JobRecord {
   userId         String?
 
   @@index([type, status])
+}
+
+model Recommendation {
+  id          String    @id @default(cuid())
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  key         String
+  kind        String
+  title       String
+  body        String    @default("")
+  reason      String    @default("")
+  sourceType  String    @default("")
+  sourceId    String    @default("")
+  sourceLabel String    @default("")
+  href        String    @default("")
+  status      String    @default("pending")
+  feedback    String?
+  snoozeUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([ownerId, key])
+  @@index([ownerId, status])
+}
+
+model AgentResponsibility {
+  id           String    @id @default(cuid())
+  ownerId      String
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  agentId      String
+  agent        Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  title        String
+  instruction  String    @default("")
+  triggerType  String    @default("schedule")
+  triggerValue String    @default("daily")
+  scopeIds     Json      @default("[]")
+  actionPolicy String    @default("suggest_only")
+  status       String    @default("active")
+  lastRunAt    DateTime?
+  nextRunAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, nextRunAt])
+  @@index([ownerId, status])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  ownerId    String
+  owner      User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind       String
+  title      String
+  body       String    @default("")
+  link       String    @default("")
+  groupedKey String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([ownerId, readAt, createdAt])
+  @@index([ownerId, groupedKey])
+}
+
+model Milestone {
+  id        String    @id @default(cuid())
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  status    String    @default("todo")
+  dueDate   DateTime?
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tasks     Task[]
+
+  @@index([projectId, position])
+}
+
+model ProjectRisk {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  severity  String   @default("medium")
+  status    String   @default("open")
+  note      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, status])
+}
+
+model CareerGoal {
+  id         String    @id @default(cuid())
+  ownerId    String
+  owner      User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title      String
+  targetRole String    @default("")
+  status     String    @default("active")
+  deadline   DateTime?
+  notes      String    @default("")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  files      File[]
+
+  @@index([ownerId, status])
+}
+
+model Subject {
+  id        String            @id @default(cuid())
+  ownerId   String
+  owner     User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  code      String?
+  examDate  DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  topics    Topic[]
+  outcomes  LearningOutcome[]
+  sessions  RevisionSession[]
+  files     File[]
+  tasks     Task[]
+
+  @@index([ownerId, updatedAt])
+}
+
+model Topic {
+  id        String            @id @default(cuid())
+  ownerId   String
+  owner     User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name      String
+  mastery   String            @default("unknown")
+  position  Int               @default(0)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  evidence  MasteryEvidence[]
+
+  @@index([subjectId, position])
+}
+
+model LearningOutcome {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId   String?
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([subjectId])
+}
+
+model RevisionSession {
+  id           String    @id @default(cuid())
+  ownerId      String
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title        String
+  scheduledFor DateTime?
+  durationMin  Int       @default(30)
+  status       String    @default("planned")
+  createdAt    DateTime  @default(now())
+
+  @@index([subjectId, status])
+}
+
+model MasteryEvidence {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  kind      String
+  score     Int?
+  total     Int?
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([topicId, createdAt])
 }
 
 model Application {

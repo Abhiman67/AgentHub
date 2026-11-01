@@ -1,5 +1,5 @@
 /**
- * Document chunking and semantic relevance scoring utilities for AgentHub RAG pipeline.
+ * Document chunking and semantic relevance scoring utilities for Backoff RAG pipeline.
  * Compatible with pgvector and local embedding generation.
  */
 

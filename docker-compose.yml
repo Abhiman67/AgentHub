@@ -4,26 +4,44 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://agenthub:agenthub@db:5432/agenthub
+      DATABASE_URL: postgresql://backoff:backoff@db:5432/backoff
       AUTH_SECRET: change-me
+      REDIS_URL: redis://redis:6379
+      JOB_EXECUTION_MODE: redis
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
+  worker:
+    build: .
+    command: bun run worker
+    environment:
+      DATABASE_URL: postgresql://backoff:backoff@db:5432/backoff
+      AUTH_SECRET: change-me
+      REDIS_URL: redis://redis:6379
+      JOB_EXECUTION_MODE: redis
+      WORKER_CONCURRENCY: 5
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   db:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: agenthub
-      POSTGRES_PASSWORD: agenthub
-      POSTGRES_DB: agenthub
+      POSTGRES_USER: backoff
+      POSTGRES_PASSWORD: backoff
+      POSTGRES_DB: backoff
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agenthub -d agenthub"]
+      test: ["CMD-SHELL", "pg_isready -U backoff -d backoff"]
       interval: 5s
       timeout: 5s
       retries: 10

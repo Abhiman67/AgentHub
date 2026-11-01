@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" role="img" aria-label="Backoff logo options round two">
+  <rect width="900" height="640" fill="#F7F5F0"/>
+  <style>
+    .t { font-family: Inter, system-ui, sans-serif; font-size: 22px; font-weight: 800; fill: #17202A; }
+    .s { font-family: Inter, system-ui, sans-serif; font-size: 14px; fill: #6F777F; }
+  </style>
+  <!-- B1 signal rise -->
+  <g>
+    <rect x="40" y="30" width="240" height="240" rx="20" fill="#06402B"/>
+    <rect x="100" y="180" width="26" height="34" rx="13" fill="#FFD34D" opacity="0.55"/>
+    <rect x="137" y="158" width="26" height="56" rx="13" fill="#FFD34D" opacity="0.75"/>
+    <rect x="174" y="132" width="26" height="82" rx="13" fill="#FFD34D"/>
+    <circle cx="200" cy="112" r="7" fill="#FFFDF9"/>
+    <text x="40" y="300" class="t">B1 · Rising signal</text>
+    <text x="40" y="324" class="s">Growth bars + a spark. Warm, simple.</text>
+  </g>
+  <!-- B2 bounce back -->
+  <g>
+    <rect x="330" y="30" width="240" height="240" rx="20" fill="#FFFFFF" stroke="#E6E1D7"/>
+    <path d="M370 220 Q410 220 425 180 Q440 140 470 140 Q500 140 510 100" fill="none" stroke="#06402B" stroke-width="9" stroke-linecap="round" stroke-dasharray="1 14"/>
+    <circle cx="370" cy="220" r="11" fill="#06402B"/>
+    <circle cx="470" cy="140" r="11" fill="#06402B"/>
+    <circle cx="516" cy="92" r="13" fill="#FFD34D"/>
+    <text x="330" y="300" class="t">B2 · Bounce back</text>
+    <text x="330" y="324" class="s">Every retry lands higher. The story.</text>
+  </g>
+  <!-- C1 soft B -->
+  <g>
+    <rect x="620" y="30" width="240" height="240" rx="20" fill="#06402B"/>
+    <path d="M688 224 V136 H712 Q742 136 742 160 Q742 180 724 184 Q744 188 744 210 Q744 224 730 224 Z" fill="#FFFDF9"/>
+    <circle cx="748" cy="118" r="9" fill="#FFD34D"/>
+    <text x="620" y="300" class="t">C1 · Soft B</text>
+    <text x="620" y="324" class="s">Chunky, friendly monogram + gold dot.</text>
+  </g>
+  <!-- D seed launch -->
+  <g>
+    <rect x="40" y="370" width="240" height="200" rx="20" fill="#FFFFFF" stroke="#E6E1D7"/>
+    <g fill="#06402B">
+      <ellipse cx="160" cy="452" rx="9" ry="20"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(45 160 452)"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(90 160 452)"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(135 160 452)"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(180 160 452)"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(225 160 452)"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(270 160 452)"/>
+      <ellipse cx="160" cy="452" rx="9" ry="20" transform="rotate(315 160 452)"/>
+    </g>
+    <circle cx="160" cy="452" r="11" fill="#FFD34D"/>
+    <path d="M160 410 L160 392 M150 398 L160 388 L170 398" stroke="#FFD34D" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="40" y="608" class="t">D · Seed launch</text>
+    <text x="40" y="632" class="s">Old flower, new momentum. Bridge option.</text>
+  </g>
+  <!-- E orbit -->
+  <g>
+    <rect x="330" y="370" width="240" height="200" rx="20" fill="#06402B"/>
+    <ellipse cx="450" cy="470" rx="62" ry="30" fill="none" stroke="#FFD34D" stroke-width="7" transform="rotate(-18 450 470)"/>
+    <circle cx="450" cy="470" r="15" fill="#FFFDF9"/>
+    <circle cx="498" cy="446" r="8" fill="#FFD34D"/>
+    <text x="330" y="608" class="t">E · Orbit retry</text>
+    <text x="330" y="632" class="s">Always circling back. Calm, cosmic.</text>
+  </g>
+</svg>

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ScrollMotion from "@/components/ScrollMotion";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -31,8 +32,9 @@ export default function SignupPage() {
 
   return (
     <main className="wrap" style={{ padding: "60px 0" }}>
-      <div className="login-card">
-        <div className="eyebrow">Join AgentHub</div>
+      <ScrollMotion />
+      <div className="login-card reveal in">
+        <div className="eyebrow">Join Backoff</div>
         <h2>Build your team.</h2>
         <p>Create your workspace and meet your AI team.</p>
         <form onSubmit={onSubmit}>

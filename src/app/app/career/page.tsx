@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ConfirmDialog, Dialog } from "@/components/Dialog";
+import Dropdown from "@/components/Dropdown";
 
 type Application = {
   id: string;
@@ -30,9 +32,9 @@ type AnalysisResult = {
 const STAGES = [
   { id: "saved", title: "Saved / Wishlist", color: "#6f777f", dot: "#9a978f" },
   { id: "preparing", title: "Preparing", color: "#0ea5c6", dot: "#0ea5c6" },
-  { id: "applied", title: "Applied", color: "#c95938", dot: "#ff7048" },
+  { id: "applied", title: "Applied", color: "#17633f", dot: "#06402b" },
   { id: "interviewing", title: "Interviewing", color: "#8057c8", dot: "#8057c8" },
-  { id: "offer", title: "Offer Received 🎉", color: "#2d6325", dot: "#3b7e32" },
+  { id: "offer", title: "Offer Received", color: "#2d6325", dot: "#3b7e32" },
   { id: "rejected", title: "Archived", color: "#929089", dot: "#b0aba2" },
 ] as const;
 
@@ -47,9 +49,16 @@ const ROLES = [
   { value: "devops", label: "DevOps / Cloud" },
 ];
 
+type CareerGoal = {
+  id: string; title: string; targetRole: string; status: string; deadline: string | null;
+};
+
 export default function CareerPage() {
   const [apps, setApps] = useState<Application[]>([]);
   const [files, setFiles] = useState<FileRow[]>([]);
+  const [goals, setGoals] = useState<CareerGoal[]>([]);
+  const [goalTitle, setGoalTitle] = useState("");
+  const [goalRole, setGoalRole] = useState("");
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [url, setUrl] = useState("");
@@ -78,7 +87,31 @@ export default function CareerPage() {
   const load = () => {
     fetch("/api/applications").then((r) => r.json()).then((d) => setApps(d.applications ?? []));
     fetch("/api/files").then((r) => r.json()).then((d) => setFiles(d.files ?? []));
+    fetch("/api/career/goals").then((r) => r.json()).then((d) => setGoals(d.goals ?? [])).catch(() => undefined);
   };
+
+  async function createGoal() {
+    if (!goalTitle.trim()) return;
+    await fetch("/api/career/goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: goalTitle.trim(), targetRole: goalRole.trim() || undefined }),
+    });
+    setGoalTitle("");
+    setGoalRole("");
+    load();
+  }
+
+  async function advanceGoal(g: CareerGoal) {
+    const next = g.status === "active" ? "paused" : g.status === "paused" ? "active" : g.status;
+    if (next === g.status) return;
+    await fetch(`/api/career/goals/${g.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    load();
+  }
 
   useEffect(() => { load(); }, []);
 
@@ -230,6 +263,35 @@ export default function CareerPage() {
         </section>
       </div>
 
+      {/* Career goals */}
+      <section className="panel" style={{ marginTop: 18 }}>
+        <div className="panel-head">
+          <h2>Career goals</h2>
+          <span className="tag">{goals.filter((g) => g.status === "active").length} active</span>
+        </div>
+        {goals.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No goals yet — set a target role to focus applications and prep.</p>}
+        {goals.slice(0, 5).map((g) => (
+          <div key={g.id} className="focus">
+            <div className="focus-body">
+              <b><Link href={`/app/career/${g.id}`}>{g.title}</Link></b>
+              <p>{g.targetRole || "No target role"} · {g.status}{g.deadline ? ` · Due ${new Date(g.deadline).toLocaleDateString()}` : ""}</p>
+            </div>
+            {(g.status === "active" || g.status === "paused") && (
+              <button type="button" className="tag" onClick={() => void advanceGoal(g)}>
+                {g.status === "active" ? "Pause" : "Resume"}
+              </button>
+            )}
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <label className="sr-only" htmlFor="goal-title">New goal</label>
+          <input id="goal-title" value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="e.g. Frontend intern, summer" className="qa-control" style={{ flex: 2, minWidth: 160 }} />
+          <label className="sr-only" htmlFor="goal-role">Target role</label>
+          <input id="goal-role" value={goalRole} onChange={(e) => setGoalRole(e.target.value)} placeholder="Target role" className="qa-control" style={{ flex: 1, minWidth: 120 }} />
+          <button type="button" onClick={() => void createGoal()} disabled={!goalTitle.trim()} className="button primary sm">Add goal</button>
+        </div>
+      </section>
+
       {/* Resume Gap Analyzer Panel */}
       <section className="panel" style={{ marginTop: 18 }}>
         <div className="panel-head">
@@ -238,34 +300,24 @@ export default function CareerPage() {
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-          <label htmlFor="resume-pick" className="sr-only">Choose resume file</label>
-          <select
-            id="resume-pick"
+          <Dropdown
+            label="Choose resume file"
             value={resumeId}
-            onChange={(e) => setResumeId(e.target.value)}
-            aria-label="Choose resume file"
-            style={{ flex: "2 1 200px", height: 42, padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: 12, background: "var(--color-card)" }}
-          >
-            <option value="">Pick an uploaded resume file…</option>
-            {files.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+            onChange={setResumeId}
+            options={[
+              { value: "", label: "Pick an uploaded resume file…" },
+              ...files.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
 
-          <label htmlFor="role-pick" className="sr-only">Target Role</label>
-          <select
-            id="role-pick"
+          <Dropdown
+            label="Target role"
             value={targetRole}
-            onChange={(e) => setTargetRole(e.target.value)}
-            aria-label="Target role"
-            style={{ flex: "1 1 180px", height: 42, padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: 12, background: "var(--color-card)" }}
-          >
-            {ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+            onChange={setTargetRole}
+            options={ROLES.map((r) => ({ value: r.value, label: r.label }))}
+          />
 
-          <button onClick={analyze} className="button" style={{ height: 42 }}>
+          <button onClick={analyze} className="button primary sm">
             Analyze resume
           </button>
         </div>
@@ -369,7 +421,7 @@ export default function CareerPage() {
                 onClick={() => setTrackerMode("kanban")}
                 className={`notion-view-tab ${trackerMode === "kanban" ? "active" : ""}`}
               >
-                ◫ Kanban Board
+                Kanban
               </button>
               <button
                 type="button"
@@ -378,7 +430,7 @@ export default function CareerPage() {
                 onClick={() => setTrackerMode("list")}
                 className={`notion-view-tab ${trackerMode === "list" ? "active" : ""}`}
               >
-                ☰ List
+                List
               </button>
             </div>
           </div>
@@ -393,7 +445,8 @@ export default function CareerPage() {
             onChange={(e) => setCompany(e.target.value)}
             placeholder="Company (e.g. Stripe, Linear)"
             aria-label="Company"
-            style={{ flex: "1 1 150px", height: 40, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)" }}
+            className="qa-control"
+            style={{ flex: "1 1 150px" }}
           />
           <label htmlFor="app-role" className="sr-only">Role</label>
           <input
@@ -402,7 +455,8 @@ export default function CareerPage() {
             onChange={(e) => setRole(e.target.value)}
             placeholder="Role (e.g. Software Engineer Intern)"
             aria-label="Role"
-            style={{ flex: "1 1 180px", height: 40, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)" }}
+            className="qa-control"
+            style={{ flex: "1 1 180px" }}
           />
           <label htmlFor="app-url" className="sr-only">Job posting URL</label>
           <input
@@ -411,21 +465,16 @@ export default function CareerPage() {
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Job posting URL (optional)"
             aria-label="Job posting URL"
-            style={{ flex: "1 1 180px", height: 40, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)", fontSize: 12 }}
+            className="qa-control"
+            style={{ flex: "1 1 180px" }}
           />
-          <label htmlFor="app-stage-select" className="sr-only">Starting Stage</label>
-          <select
-            id="app-stage-select"
+          <Dropdown
+            label="Starting stage"
             value={initialStatus}
-            onChange={(e) => setInitialStatus(e.target.value)}
-            aria-label="Stage"
-            style={{ flex: "1 1 130px", height: 40, padding: "0 10px", border: "1px solid var(--color-line)", borderRadius: 10, background: "var(--color-card)", fontSize: 12 }}
-          >
-            {STAGES.map((s) => (
-              <option key={s.id} value={s.id}>{s.title}</option>
-            ))}
-          </select>
-          <button onClick={() => create()} className="button" style={{ height: 40, padding: "0 18px", fontSize: 13 }}>
+            onChange={setInitialStatus}
+            options={STAGES.map((s) => ({ value: s.id as string, label: s.title as string, dot: s.dot as string }))}
+          />
+          <button onClick={() => create()} className="button primary sm">
             + Add application
           </button>
         </div>
@@ -500,15 +549,8 @@ export default function CareerPage() {
                                 type="button"
                                 onClick={() => setDeletingApp(a)}
                                 title="Delete application"
-                                style={{
-                                  background: "none",
-                                  border: 0,
-                                  color: "var(--color-muted)",
-                                  cursor: "pointer",
-                                  padding: 0,
-                                  fontSize: 12,
-                                  fontWeight: 750,
-                                }}
+                                className="link-danger"
+                                aria-label={`Delete application for ${a.role}`}
                               >
                                 ✕
                               </button>
@@ -538,7 +580,7 @@ export default function CareerPage() {
                               }}
                               title="Click to view full notes"
                             >
-                              📝 {a.notes}
+                              {a.notes}
                             </div>
                           )}
 
@@ -558,10 +600,9 @@ export default function CareerPage() {
                                 type="button"
                                 onClick={() => coverLetter(a)}
                                 className="tag"
-                                style={{ fontSize: 10.5, padding: "3px 6px", cursor: "pointer", border: 0 }}
                                 title="Draft cover letter with AI"
                               >
-                                ✦ Letter
+                                Letter
                               </button>
                               <button
                                 type="button"
@@ -570,10 +611,9 @@ export default function CareerPage() {
                                   setNotesText(a.notes || "");
                                 }}
                                 className="tag"
-                                style={{ fontSize: 10.5, padding: "3px 6px", cursor: "pointer", border: 0 }}
                                 title="Add interview notes & contacts"
                               >
-                                📝 Notes
+                                Notes
                               </button>
                             </div>
 
@@ -626,16 +666,12 @@ export default function CareerPage() {
                     </div>
                   </div>
 
-                  <select
+                  <Dropdown
+                    label="Application status"
                     value={a.status}
-                    onChange={(e) => move(a.id, e.target.value)}
-                    aria-label="Application status"
-                    style={{ padding: "6px 10px", border: "1px solid var(--color-line)", borderRadius: 99, fontSize: 11, background: "var(--color-card)", fontWeight: 600 }}
-                  >
-                    {STAGES.map((s) => (
-                      <option key={s.id} value={s.id}>{s.title}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => move(a.id, v)}
+                    options={STAGES.map((s) => ({ value: s.id as string, label: s.title as string, dot: s.dot as string }))}
+                  />
 
                   <button
                     onClick={() => {
@@ -643,19 +679,18 @@ export default function CareerPage() {
                       setNotesText(a.notes || "");
                     }}
                     className="tag"
-                    style={{ cursor: "pointer", border: 0 }}
                   >
                     {a.notes ? "View notes" : "Add note"}
                   </button>
 
-                  <button onClick={() => coverLetter(a)} className="tag" style={{ cursor: "pointer", border: 0 }}>
-                    ✦ Draft letter
+                  <button onClick={() => coverLetter(a)} className="tag">
+                    Draft letter
                   </button>
 
                   <button
                     onClick={() => setDeletingApp(a)}
                     aria-label={`Delete application for ${a.role}`}
-                    style={{ background: "none", border: 0, color: "#c0392b", cursor: "pointer", padding: 4, fontWeight: 700 }}
+                    className="link-danger"
                     title="Delete application"
                   >
                     ✕
@@ -682,9 +717,8 @@ export default function CareerPage() {
                   setTimeout(() => setCopied(false), 2000);
                 }}
                 className="tag"
-                style={{ cursor: "pointer", border: 0, color: copied ? "#2d6325" : "inherit" }}
               >
-                {copied ? "✓ Copied to clipboard!" : "⎘ Copy text"}
+                {copied ? "Copied to clipboard!" : "Copy text"}
               </button>
             </div>
           </div>
@@ -709,7 +743,6 @@ export default function CareerPage() {
             placeholder="e.g. Recruiter call on Tuesday with Sarah. Need to review system design fundamentals and prepare questions about their API team…"
             rows={5}
             className="dialog-input"
-            style={{ resize: "vertical", minHeight: 120, marginBottom: 16 }}
             autoFocus
           />
 

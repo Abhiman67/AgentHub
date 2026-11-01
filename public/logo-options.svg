@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-label="Backoff logo options">
+  <rect width="900" height="360" fill="#F7F5F0"/>
+  <style>
+    .t { font-family: Inter, system-ui, sans-serif; font-size: 22px; font-weight: 800; fill: #17202A; }
+    .s { font-family: Inter, system-ui, sans-serif; font-size: 14px; fill: #6F777F; }
+  </style>
+  <!-- A -->
+  <g>
+    <rect x="40" y="30" width="240" height="240" rx="20" fill="#FFFFFF" stroke="#E6E1D7"/>
+    <path d="M160 92 A52 52 0 1 1 108 148" fill="none" stroke="#06402B" stroke-width="11" stroke-linecap="round"/>
+    <path d="M108 118 L106 152 L138 146 Z" fill="#FFD34D"/>
+    <circle cx="160" cy="144" r="10" fill="#FFD34D"/>
+    <text x="40" y="300" class="t">A · Retry loop</text>
+    <text x="40" y="324" class="s">Comeback arrow. Motion, resilience.</text>
+  </g>
+  <!-- B -->
+  <g>
+    <rect x="330" y="30" width="240" height="240" rx="20" fill="#06402B"/>
+    <circle cx="400" cy="180" r="14" fill="#FFD34D"/>
+    <circle cx="450" cy="180" r="14" fill="#FFD34D"/>
+    <circle cx="512" cy="180" r="14" fill="#FFD34D"/>
+    <rect x="392" y="216" width="130" height="10" rx="5" fill="#FFD34D" opacity="0.45"/>
+    <text x="330" y="300" class="t">B · Backoff steps</text>
+    <text x="330" y="324" class="s">Growing gaps = exponential backoff.</text>
+  </g>
+  <!-- C -->
+  <g>
+    <rect x="620" y="30" width="240" height="240" rx="20" fill="#FFFFFF" stroke="#E6E1D7"/>
+    <path d="M688 228 V132 H716 Q748 132 748 158 Q748 178 730 184 Q752 190 752 214 Q752 228 738 228 Z" fill="none" stroke="#06402B" stroke-width="11" stroke-linejoin="round"/>
+    <path d="M716 108 L740 84 L744 116 Z" fill="#FFD34D"/>
+    <text x="620" y="300" class="t">C · Rebound B</text>
+    <text x="620" y="324" class="s">Monogram whose spine launches up.</text>
+  </g>
+</svg>

@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getUsage } from "@/lib/usage";
 import { getQuota } from "@/lib/quotas";
+import { handleApi, HttpError, invalid } from "@/lib/api";
 
-export async function GET() {
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const usage = await getUsage(u.id);
-  const [messageQuota, fileQuota] = await Promise.all([getQuota(u.id, "messages"), getQuota(u.id, "files")]);
-  const agents = await db.agent.count({ where: { ownerId: u.id } });
+export const GET = handleApi(async (_req, { userId }) => {
+  const usage = await getUsage(userId);
+  const [messageQuota, fileQuota] = await Promise.all([getQuota(userId, "messages"), getQuota(userId, "files")]);
+  const agents = await db.agent.count({ where: { ownerId: userId } });
   return NextResponse.json({
     plan: "Student Pro (MVP)",
     renewal: "No billing in MVP",
@@ -19,24 +15,23 @@ export async function GET() {
     ...usage,
     limits: { agents: "unlimited", messages: messageQuota, files: fileQuota },
   });
-}
+});
 
-export async function POST(req: Request) {
-  const s = await auth();
-  if (!s?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
+export const POST = handleApi(async (req, { userId }) => {
+  let type: unknown;
   try {
-    const { type } = await req.json();
-    if (!type || typeof type !== "string") {
-      return NextResponse.json({ error: "Invalid type" }, { status: 400 });
-    }
-    const { trackUsage } = await import("@/lib/usage");
-    await trackUsage(u.id, type.slice(0, 50));
-    return NextResponse.json({ ok: true });
+    ({ type } = await req.json());
   } catch {
-    return NextResponse.json({ error: "Failed to log event" }, { status: 500 });
+    throw new HttpError("USAGE_TRACK_FAILED", 500, "Failed to log event");
   }
-}
-
+  if (!type || typeof type !== "string") {
+    throw invalid("Invalid type");
+  }
+  try {
+    const { trackUsage } = await import("@/lib/usage");
+    await trackUsage(userId, (type as string).slice(0, 50));
+  } catch {
+    throw new HttpError("USAGE_TRACK_FAILED", 500, "Failed to log event");
+  }
+  return NextResponse.json({ ok: true });
+});

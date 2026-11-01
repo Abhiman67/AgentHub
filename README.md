@@ -1,8 +1,8 @@
-# AgentHub — Your AI Student Team
+# Backoff — Your AI Student Team
 
 > **Your goals in. Momentum out.**
 
-AgentHub gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, and Interview Coach** — orchestrated inside a unified workspace for coursework, software projects, career growth, and daily execution.
+Backoff gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, and Interview Coach** — orchestrated inside a unified workspace for coursework, software projects, career growth, and daily execution.
 
 Built on an autonomous **Agentic Architecture** with a deterministic state machine, permission-controlled tool registry, external integrations (including MCP support), asynchronous job processing, and human-in-the-loop safety approvals.
 
@@ -44,7 +44,7 @@ Built on an autonomous **Agentic Architecture** with a deterministic state machi
                                              │ HTTP / SSE
                                              ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 AgentHub Platform Core                                 │
+│                                 Backoff Platform Core                                 │
 │                                                                                        │
 │  ┌───────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────┐ │
 │  │   Agent Orchestrator  │──▶│    AgentRun State Machine │──▶│   Event Stream (SSE)  │ │
@@ -106,8 +106,8 @@ Agent executions follow a strict, deterministic state machine:
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/Abhiman67/AgentHub.git
-cd AgentHub
+git clone https://github.com/Abhiman67/Backoff.git
+cd Backoff
 cp .env.example .env
 bun install
 ```
@@ -159,7 +159,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 ## 🗂️ Project Directory Structure
 
 ```text
-AgentHub/
+Backoff/
 ├── prisma/
 │   ├── schema.prisma                        # Unified database models
 │   ├── seed.ts                              # Initial fixture seeder
@@ -256,7 +256,7 @@ bun run typecheck
 ## 🐳 Production Deployment
 
 ### Docker Compose (Full Stack)
-Run AgentHub alongside PostgreSQL 16 and Redis:
+Run Backoff alongside PostgreSQL 16 and Redis:
 ```bash
 docker compose up -d --build
 bunx prisma migrate deploy
@@ -265,7 +265,7 @@ bunx prisma migrate deploy
 ### Environment Configuration
 Ensure production environment variables are set in `.env`:
 ```bash
-DATABASE_URL="postgresql://agenthub:agenthub@db:5432/agenthub?schema=public"
+DATABASE_URL="postgresql://backoff:backoff@db:5432/backoff?schema=public"
 AUTH_SECRET="use-a-strong-32-byte-hex-or-base64-secret"
 NEXTAUTH_URL="https://your-domain.com"
 ENCRYPTION_SECRET="32-byte-hex-key-for-integrations-aes-256-gcm"

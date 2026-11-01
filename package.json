@@ -1,7 +1,7 @@
 {
-  "name": "agenthub",
+  "name": "backoff",
   "version": "1.0.0",
-  "description": "AgentHub - personal AI team for students",
+  "description": "Backoff - personal AI team for students",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -9,16 +9,20 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "sh scripts/test-integration.sh",
     "format": "prettier --write .",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "bun prisma/seed.ts",
+    "db:pg-sync": "sed 's/provider = \"sqlite\"/provider = \"postgresql\"/' prisma/schema.prisma > prisma/schema.postgres.prisma",
+    "worker": "bun scripts/worker.ts",
     "db:postgres": "docker compose up -d db redis && prisma migrate dev"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bullmq": "^6.3.9",
     "next": "^16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

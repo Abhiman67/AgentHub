@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type DialogProps = {
   isOpen: boolean;
@@ -10,6 +10,41 @@ type DialogProps = {
   maxWidth?: number;
 };
 
+/** Focus trap: keeps Tab inside the modal and restores focus on close. */
+export function useFocusTrap(active: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!active || !ref.current) return;
+    const root = ref.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")).filter(
+        (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true"
+      );
+    focusables()[0]?.focus();
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [active]);
+  return ref;
+}
+
 export function Dialog({
   isOpen,
   onClose,
@@ -18,6 +53,7 @@ export function Dialog({
   children,
   maxWidth = 440,
 }: DialogProps) {
+  const trapRef = useFocusTrap(isOpen);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -37,6 +73,7 @@ export function Dialog({
   return (
     <div className="dialog-backdrop" onClick={onClose} role="presentation">
       <div
+        ref={trapRef}
         className="dialog-modal"
         style={{ maxWidth }}
         onClick={(e) => e.stopPropagation()}
@@ -98,6 +135,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const isPending = Boolean(loading || isLoading);
   const textBody = description || message || "";
+  const trapRef = useFocusTrap(isOpen);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && !isPending) onClose();
@@ -120,6 +158,7 @@ export function ConfirmDialog({
   return (
     <div className="dialog-backdrop" onClick={isPending ? undefined : onClose} role="presentation">
       <div
+        ref={trapRef}
         className="dialog-modal"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
@@ -183,6 +222,7 @@ export function PromptDialog({
   cancelText = "Cancel",
   loading = false,
 }: PromptDialogProps) {
+  const trapRef = useFocusTrap(isOpen);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && !loading) onClose();
@@ -211,6 +251,7 @@ export function PromptDialog({
   return (
     <div className="dialog-backdrop" onClick={loading ? undefined : onClose} role="presentation">
       <div
+        ref={trapRef}
         className="dialog-modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

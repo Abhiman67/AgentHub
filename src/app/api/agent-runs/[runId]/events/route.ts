@@ -1,14 +1,19 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { sseEncodeRun } from "@/lib/agents/types";
+import { apiError, validateRunId } from "@/lib/api-errors";
 
 export async function GET(_: Request, { params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
+  if (!validateRunId(runId)) return apiError("INVALID_INPUT", "Invalid run id.", 400);
   const s = await auth();
-  if (!s?.user?.email) return new Response("unauthorized", { status: 401 });
+  if (!s?.user?.email) return apiError("UNAUTHORIZED", "Sign in required.", 401);
   const u = await db.user.findUnique({ where: { email: s.user.email } });
-  const run = await db.agentRun.findFirst({ where: { id: runId, ownerId: u?.id }, include: { steps: { orderBy: { sequence: "asc" } } } });
-  if (!run) return new Response("not found", { status: 404 });
+  if (!u) return apiError("USER_NOT_FOUND", "User not found.", 404);
+  const run = await db.agentRun.findFirst({ where: { id: runId, ownerId: u.id }, include: { steps: { orderBy: { sequence: "asc" } } } });
+  if (!run) return apiError("RUN_NOT_FOUND", "Agent run was not found.", 404);
+  // Bounded snapshot: replays current progress then closes cleanly.
+  // Clients poll for active runs; terminal runs resolve on first read.
   const stream = new ReadableStream({
     start(controller) {
       const enc = new TextEncoder();

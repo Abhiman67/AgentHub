@@ -42,7 +42,7 @@ export default function AgentsPage() {
           <h1>Your AI team</h1>
           <p>Specialists that remember your goals and help you keep moving.</p>
         </div>
-        <button className="button" onClick={() => setShowForm(!showForm)}>+ Create custom agent</button>
+        <button className="button primary" onClick={() => setShowForm(!showForm)}>Create custom agent</button>
       </div>
       {showForm && (
         <div className="card form-card" id="create" style={{ marginBottom: 15 }}>
@@ -50,10 +50,10 @@ export default function AgentsPage() {
           <p>Build a focused agent with your own role, tone and context. Custom instructions cannot override safety rules.</p>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <label htmlFor="custom-name" className="sr-only">Agent name</label>
-            <input id="custom-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Agent name" style={{ flex: 1, height: 44, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 12 }} />
+            <input id="custom-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Agent name" className="qa-control" style={{ flex: 1 }} />
             <label htmlFor="custom-role" className="sr-only">Agent role</label>
-            <input id="custom-role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role" aria-label="Agent role" style={{ flex: 1, height: 44, padding: "0 14px", border: "1px solid var(--color-line)", borderRadius: 12 }} />
-            <button onClick={createCustom} className="button">Create</button>
+            <input id="custom-role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role" aria-label="Agent role" className="qa-control" style={{ flex: 1 }} />
+            <button onClick={createCustom} className="button primary sm">Create</button>
           </div>
         </div>
       )}
@@ -75,7 +75,7 @@ export default function AgentsPage() {
                 <p>{a.description || a.role}</p>
                 <div className="agent-foot">
                   <span>{a.category}</span>
-                  <Link href={`/app/agents/${a.id}`} className="status" style={{ textDecoration: "none" }}>● Open →</Link>
+                  <Link href={`/app/agents/${a.id}`} className="status">Open →</Link>
                 </div>
               </article>
             );
@@ -86,7 +86,7 @@ export default function AgentsPage() {
             <p>Build a focused agent with your own role, tone and context.</p>
             <div className="agent-foot">
               <span>Custom</span>
-              <button onClick={() => setShowForm(true)} style={{ color: "var(--color-brand)", fontWeight: 750, background: "none", border: 0, cursor: "pointer" }}>Create →</button>
+              <button onClick={() => setShowForm(true)} className="tag">Create →</button>
             </div>
           </article>
         </div>

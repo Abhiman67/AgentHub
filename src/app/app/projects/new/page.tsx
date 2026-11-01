@@ -21,9 +21,15 @@ export default function NewProject() {
   return <main className="mx-auto max-w-xl p-8">
     <Link href="/app/projects" className="text-sm underline">← Back to projects</Link>
     <h1 className="mt-6 text-3xl font-extrabold">Create project</h1>
-    <form onSubmit={submit} className="panel mt-6 space-y-4">
-      <label className="block text-sm font-semibold">Project name<input required maxLength={100} value={name} onChange={e => setName(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-line bg-card px-3" /></label>
-      <label className="block text-sm font-semibold">Description<textarea maxLength={2000} value={description} onChange={e => setDescription(e.target.value)} className="mt-2 min-h-28 w-full rounded-xl border border-line bg-card p-3" /></label>
+    <form onSubmit={submit} className="panel form-card" style={{ marginTop: 24 }}>
+      <div className="field">
+        <label htmlFor="project-name">Project name</label>
+        <input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} />
+      </div>
+      <div className="field">
+        <label htmlFor="project-description">Description</label>
+        <textarea id="project-description" maxLength={2000} value={description} onChange={e => setDescription(e.target.value)} />
+      </div>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <button disabled={saving} className="button primary" type="submit">{saving ? "Creating…" : "Create project"}</button>
     </form>

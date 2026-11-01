@@ -1,0 +1,15 @@
+ALTER TABLE "File" ADD COLUMN "folder" TEXT NOT NULL DEFAULT 'Inbox';
+ALTER TABLE "File" ADD COLUMN "tags" TEXT NOT NULL DEFAULT '[]';
+CREATE TABLE "NoteLink" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "ownerId" TEXT NOT NULL,
+  "fromId" TEXT NOT NULL,
+  "toId" TEXT NOT NULL,
+  "label" TEXT NOT NULL DEFAULT '',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "NoteLink_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "NoteLink_fromId_fkey" FOREIGN KEY ("fromId") REFERENCES "File" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "NoteLink_toId_fkey" FOREIGN KEY ("toId") REFERENCES "File" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "NoteLink_fromId_toId_key" ON "NoteLink"("fromId", "toId");
+CREATE INDEX "NoteLink_ownerId_toId_idx" ON "NoteLink"("ownerId", "toId");

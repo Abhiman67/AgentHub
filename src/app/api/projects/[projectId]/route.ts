@@ -1,36 +1,25 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { projectUpdateSchema } from "@/lib/validations";
+import { handleApi, invalid, notFound } from "@/lib/api";
 
-async function uid() {
-  const s = await auth();
-  if (!s?.user?.email) return null;
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  return u?.id ?? null;
-}
-
-export async function GET(_: Request, { params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = await params;
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const project = await db.project.findFirst({ where: { id: projectId, ownerId: id }, include: { tasks: true } });
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const GET = handleApi<{ projectId: string }>(async (_req, { userId: id }, params) => {
+  const { projectId } = params;
+  const project = await db.project.findFirst({ where: { id: projectId, ownerId: id }, include: { tasks: true, milestones: { orderBy: { position: "asc" } }, risks: { orderBy: { createdAt: "desc" } } } });
+  if (!project) throw notFound("Project");
   return NextResponse.json({ project });
-}
+});
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = await params;
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const PATCH = handleApi<{ projectId: string }>(async (req, { userId: id }, params) => {
+  const { projectId } = params;
   const existing = await db.project.findFirst({ where: { id: projectId, ownerId: id } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) throw notFound("Project");
   const parsed = projectUpdateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Invalid project update" }, { status: 400 });
+  if (!parsed.success) throw invalid("Invalid project update");
   const { name, description, status, linkedAgentIds, members } = parsed.data;
   if (linkedAgentIds) {
     const count = await db.agent.count({ where: { id: { in: linkedAgentIds }, ownerId: id } });
-    if (count !== linkedAgentIds.length) return NextResponse.json({ error: "Invalid agent" }, { status: 400 });
+    if (count !== linkedAgentIds.length) throw invalid("Invalid agent");
   }
   const project = await db.project.update({
     where: { id: projectId },
@@ -38,19 +27,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ projec
       ...(name ? { name: String(name).slice(0, 100) } : {}),
       ...(description !== undefined ? { description: String(description).slice(0, 2000) } : {}),
       ...(status ? { status } : {}),
-      ...(linkedAgentIds !== undefined ? { linkedAgentIds: JSON.stringify(linkedAgentIds) } : {}),
-      ...(members !== undefined ? { members: JSON.stringify(members) } : {}),
+      ...(linkedAgentIds !== undefined ? { linkedAgentIds } : {}),
+      ...(members !== undefined ? { members } : {}),
     },
   });
   return NextResponse.json({ project });
-}
+});
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = await params;
-  const id = await uid();
-  if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const DELETE = handleApi<{ projectId: string }>(async (_req, { userId: id }, params) => {
+  const { projectId } = params;
   const existing = await db.project.findFirst({ where: { id: projectId, ownerId: id } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing) throw notFound("Project");
   await db.project.delete({ where: { id: projectId } });
   return NextResponse.json({ ok: true });
-}
+});

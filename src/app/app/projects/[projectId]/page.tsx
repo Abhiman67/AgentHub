@@ -3,8 +3,11 @@ import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/Dialog";
+import Dropdown from "@/components/Dropdown";
 
 type Task = { id: string; title: string; status: string; priority: string };
+type Milestone = { id: string; title: string; status: string; dueDate: string | null; tasks: { id: string; status: string }[] };
+type Risk = { id: string; title: string; severity: string; status: string; note: string };
 type Agent = { id: string; name: string; template: string };
 type Project = {
   id: string;
@@ -12,9 +15,11 @@ type Project = {
   description: string;
   type: string;
   status: string;
-  linkedAgentIds: string;
-  members: string;
+  linkedAgentIds: string[];
+  members: string[];
   tasks: Task[];
+  milestones: Milestone[];
+  risks: Risk[];
 };
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -23,6 +28,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
   const [project, setProject] = useState<Project | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newMilestone, setNewMilestone] = useState("");
+  const [newRisk, setNewRisk] = useState("");
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -73,6 +80,46 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     load();
   }
 
+  async function addMilestone() {
+    if (!newMilestone.trim()) return;
+    await fetch(`/api/projects/${projectId}/milestones`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newMilestone.trim() }),
+    });
+    setNewMilestone("");
+    load();
+  }
+
+  async function toggleMilestone(m: Milestone) {
+    await fetch(`/api/projects/${projectId}/milestones`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: m.id, status: m.status === "completed" ? "todo" : "completed" }),
+    });
+    load();
+  }
+
+  async function addRisk() {
+    if (!newRisk.trim()) return;
+    await fetch(`/api/projects/${projectId}/risks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newRisk.trim() }),
+    });
+    setNewRisk("");
+    load();
+  }
+
+  async function resolveRisk(r: Risk) {
+    await fetch(`/api/projects/${projectId}/risks`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: r.id, status: r.status === "open" ? "resolved" : "open" }),
+    });
+    load();
+  }
+
   async function updateStatus(status: string) {
     await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
@@ -109,7 +156,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         <div className="text-3xl mb-2">▣</div>
         <h2 className="text-lg font-bold">Project not found</h2>
         <p className="text-sm text-muted mt-1">This project may have been removed or archived.</p>
-        <Link href="/app/projects" className="button primary mt-4 inline-flex" style={{ display: "inline-flex" }}>
+        <Link href="/app/projects" className="button primary mt-4 inline-flex">
           Back to Projects
         </Link>
       </main>
@@ -122,7 +169,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
     agentMap.set(a.template, a.name);
   });
 
-  const linked: string[] = JSON.parse(project.linkedAgentIds || "[]");
+  const linked: string[] = Array.isArray(project.linkedAgentIds) ? project.linkedAgentIds : [];
   const linkedNames = linked.map((id) => agentMap.get(id) || id);
   const tasks = project.tasks ?? [];
   const done = tasks.filter((t) => t.status === "completed");
@@ -136,7 +183,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         <button
           type="button"
           onClick={() => setShowDeleteModal(true)}
-          style={{ background: "none", border: 0, color: "#c0392b", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          className="link-danger"
         >
           Delete project
         </button>
@@ -150,23 +197,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
           </p>
         </div>
 
-        <select
+        <Dropdown
           value={project.status}
-          onChange={(e) => updateStatus(e.target.value)}
-          aria-label="Project status"
-          style={{
-            padding: "6px 12px",
-            borderRadius: 999,
-            border: "1px solid var(--color-line)",
-            background: "var(--color-card)",
-            fontSize: 12,
-            fontWeight: 700,
-          }}
-        >
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="completed">Completed</option>
-        </select>
+          options={[
+            { value: "active", label: "Active" },
+            { value: "paused", label: "Paused" },
+            { value: "completed", label: "Completed" },
+          ]}
+          onChange={(v) => updateStatus(v)}
+          label="Project status"
+        />
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -183,10 +223,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         {project.description || "No description set. Ask Project Guide to help outline your milestone objectives."}
       </p>
 
-      <section className="mt-6 rounded-3xl border border-line bg-card p-5">
+      <section className="panel" style={{ marginTop: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <p className="font-bold" style={{ margin: 0 }}>Project Milestones & Tasks</p>
-          <span className="tag" style={{ fontSize: 11 }}>{todo.length} remaining</span>
+          <span className="tag">{todo.length} remaining</span>
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -195,9 +235,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
             onChange={(e) => setNewTaskTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
             placeholder="Add milestone task to this project…"
-            style={{ flex: 1, height: 38, padding: "0 12px", borderRadius: 10, border: "1px solid var(--color-line)", fontSize: 13 }}
+            className="qa-control"
+            style={{ flex: 1 }}
           />
-          <button onClick={addTask} className="button" style={{ height: 38, padding: "0 14px", fontSize: 12 }}>
+          <button onClick={addTask} className="button sm">
             + Add
           </button>
         </div>
@@ -211,14 +252,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
                 <button
                   onClick={() => toggleTask(t)}
                   className={`check${t.status === "completed" ? " done" : ""}`}
-                  style={{ cursor: "pointer", background: "none", width: 20, height: 20, fontSize: 11 }}
+                  type="button"
                 >
                   {t.status === "completed" ? "✓" : ""}
                 </button>
                 <span style={{ fontSize: 13, textDecoration: t.status === "completed" ? "line-through" : "none", color: t.status === "completed" ? "var(--color-muted)" : "inherit" }}>
                   {t.title}
                 </span>
-                <span className="tag" style={{ marginLeft: "auto", fontSize: 10 }}>
+                <span className="tag" style={{ marginLeft: "auto" }}>
                   {t.status}
                 </span>
               </div>
@@ -227,7 +268,93 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ projec
         )}
       </section>
 
-      <div className="mt-4 rounded-3xl border border-line bg-card p-5">
+      <section className="panel" style={{ marginTop: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <p className="font-bold" style={{ margin: 0 }}>Milestones</p>
+          <span className="tag">{(project.milestones ?? []).filter((m) => m.status !== "completed").length} open</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <label className="sr-only" htmlFor="new-milestone">New milestone</label>
+          <input
+            id="new-milestone"
+            value={newMilestone}
+            onChange={(e) => setNewMilestone(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addMilestone()}
+            placeholder="Add a milestone…"
+            className="qa-control"
+            style={{ flex: 1 }}
+          />
+          <button onClick={addMilestone} className="button sm">
+            + Add
+          </button>
+        </div>
+        {(project.milestones ?? []).length === 0 ? (
+          <p className="text-sm text-muted">No milestones yet. Break the project into phases above.</p>
+        ) : (
+          <div className="space-y-2">
+            {(project.milestones ?? []).map((m) => {
+              const done = m.tasks.filter((t) => t.status === "completed").length;
+              return (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--color-line)" }}>
+                  <button
+                    onClick={() => toggleMilestone(m)}
+                    className={`check${m.status === "completed" ? " done" : ""}`}
+                    type="button"
+                    aria-label={`Toggle ${m.title}`}
+                  >
+                    {m.status === "completed" ? "✓" : ""}
+                  </button>
+                  <span style={{ fontSize: 13, textDecoration: m.status === "completed" ? "line-through" : "none", color: m.status === "completed" ? "var(--color-muted)" : "inherit" }}>
+                    {m.title}
+                  </span>
+                  <span className="tag" style={{ marginLeft: "auto" }}>
+                    {m.tasks.length ? `${done}/${m.tasks.length} tasks` : m.status}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="panel" style={{ marginTop: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <p className="font-bold" style={{ margin: 0 }}>Risks</p>
+          <span className="tag">{(project.risks ?? []).filter((r) => r.status === "open").length} open</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <label className="sr-only" htmlFor="new-risk">New risk</label>
+          <input
+            id="new-risk"
+            value={newRisk}
+            onChange={(e) => setNewRisk(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addRisk()}
+            placeholder="Flag a risk (scope, deadline, dependency)…"
+            className="qa-control"
+            style={{ flex: 1 }}
+          />
+          <button onClick={addRisk} className="button sm">
+            + Add
+          </button>
+        </div>
+        {(project.risks ?? []).length === 0 ? (
+          <p className="text-sm text-muted">No risks flagged. Project Guide can help spot them — but only you mark them resolved.</p>
+        ) : (
+          <div className="space-y-2">
+            {(project.risks ?? []).map((r) => (
+              <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--color-line)" }}>
+                <span style={{ fontSize: 13, textDecoration: r.status !== "open" ? "line-through" : "none" }}>{r.title}</span>
+                <span className="tag">{r.severity}</span>
+                <button onClick={() => resolveRisk(r)} className="tag" style={{ marginLeft: "auto" }}>
+                  {r.status === "open" ? "Resolve" : "Reopen"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="panel" style={{ marginTop: 16 }}>
         <p className="font-bold">Linked agents</p>
         <p className="text-sm text-muted">
           {linkedNames.length ? linkedNames.join(", ") : "No agents linked yet. Link Project Guide or Code Mentor from the Projects directory."}

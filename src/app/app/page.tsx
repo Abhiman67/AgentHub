@@ -2,15 +2,9 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import Link from "next/link";
-
-const agentIcon: Record<string, [string, string]> = {
-  "study-coach": ["◒", "yellow"],
-  "project-guide": ["⌘", "blue"],
-  "career-scout": ["↗", "green"],
-  "writing-buddy": ["✎", "lavender"],
-  "code-mentor": ["◉", "peach"],
-  "interview-coach": ["☼", "peri"],
-};
+import { ClassroomDashboard } from "@/components/ClassroomDashboard";
+import { QuickCapture } from "@/components/QuickCapture";
+import { Recommendations } from "@/components/Recommendations";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -26,19 +20,30 @@ export default async function AppHome() {
   const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-  const [tasks, projects, agents, apps, files, doneCount] = await Promise.all([
+  const [tasks, projects, agents, apps, files, notes, doneCount, pendingApprovals, activity] = await Promise.all([
     db.task.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: "desc" }, take: 20 }),
     db.project.findMany({ where: { ownerId: user.id }, include: { tasks: true }, orderBy: { updatedAt: "desc" }, take: 3 }),
     db.agent.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: "asc" }, take: 6 }),
     db.application.findMany({ where: { ownerId: user.id }, take: 50 }),
     db.file.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: "desc" }, take: 5 }),
+    db.file.findMany({ where: { ownerId: user.id, mimeType: "text/markdown", status: { not: "deleted" } }, orderBy: { createdAt: "desc" }, take: 3 }),
     db.task.count({ where: { ownerId: user.id, status: "completed" } }),
+    db.approval.findMany({ where: { ownerId: user.id, status: "pending" }, orderBy: { createdAt: "desc" }, take: 5 }),
+    db.auditEvent.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: "desc" }, take: 8 }),
   ]);
 
   const focus = tasks.filter((t) => t.status !== "completed").slice(0, 4);
+  const now = Date.now(); // eslint-disable-line -- server component: evaluated once per request, not re-rendered
+  const openTasks = tasks.filter((t) => t.status !== "completed" && t.status !== "cancelled");
+  const overdue = tasks.filter((t) => t.dueDate && t.status !== "completed" && t.status !== "cancelled" && new Date(t.dueDate).getTime() < now).slice(0, 3);
   const deadlines = tasks.filter((t) => t.dueDate && t.status !== "completed").sort((a, b) => +new Date(a.dueDate!) - +new Date(b.dueDate!)).slice(0, 3);
   const interviews = apps.filter((a) => a.status === "interviewing").length;
   const soonApps = apps.filter((a) => ["applied", "interviewing"].includes(a.status)).length;
+
+  const studyCoach = agents.find((a) => a.template === "study-coach") || agents[0];
+  const classroomAccount = await db.integrationAccount.findUnique({
+    where: { ownerId_provider: { ownerId: user.id, provider: "classroom" } },
+  });
 
   const step1Done = files.length > 0;
   const step2Done = tasks.length > 0 || doneCount > 0;
@@ -47,15 +52,52 @@ export default async function AppHome() {
 
   return (
     <>
-      <div className="welcome">
+      <div className="welcome student-home-intro">
         <div>
-          <h1>{greet}, {first} <span>✦</span></h1>
-          <p>Here&apos;s what your team has been working on. You&apos;re doing great.</p>
+          <p className="student-home-kicker">{greet}, {first}</p>
+          <h1>What are you moving forward today? <span>✦</span></h1>
+          {openTasks.length > 0 ? <p>You have <strong>{openTasks.length} open {openTasks.length === 1 ? "task" : "tasks"}</strong>. Start with one useful next step.</p> : <p>Ask about a course, project, deadline, or career goal and Backoff will help you make a plan.</p>}
         </div>
         <div className="date-pill">{today} ▾</div>
       </div>
 
-      {/* 3-Step First-Run Checklist */}
+      {/* Study copilot ask box & Google Classroom integration */}
+      <ClassroomDashboard
+        studentEmail={user.email}
+        studyCoachId={studyCoach?.id}
+        isConnected={!!classroomAccount}
+      />
+      {!classroomAccount && (
+        <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
+          <Link href="/app/settings/integrations">Connect Google Classroom</Link> to pull courses and deadlines here.
+        </p>
+      )}
+
+      <section className="student-mission-card" aria-labelledby="mission-heading">
+        <div>
+          <span className="student-home-kicker">Your next useful step</span>
+          <h2 id="mission-heading">{overdue.length > 0 ? `Start with ${overdue[0].title}` : deadlines.length > 0 ? `Prepare for ${deadlines[0].title}` : projects.length > 0 ? `Move ${projects[0].name} forward` : notes.length > 0 ? `Continue ${notes[0].name.replace(/\.md$/, "")}` : "Tell Backoff what you want to finish"}</h2>
+          <p>{overdue.length > 0 ? "This is overdue. Backoff can help you break it into a smaller recovery plan." : deadlines.length > 0 ? "Use your course context to make a focused plan before the deadline arrives." : notes.length > 0 ? "Turn your latest note into a quiz, revision session, or next action." : "Ask about an exam, assignment, project, or internship and turn it into an actionable plan."}</p>
+        </div>
+        <Link href={studyCoach ? `/app/agents/${studyCoach.id}?q=${encodeURIComponent(overdue[0]?.title ?? deadlines[0]?.title ?? (notes[0] ? `Turn my note ${notes[0].name} into a study plan` : "Help me choose my next student priority"))}` : "/app/agents"} className="button primary-orange">Make a plan ↗</Link>
+      </section>
+
+      {pendingApprovals.length > 0 && (
+        <section className="panel" style={{ margin: "16px 0", borderColor: "var(--color-brand)" }} aria-live="polite">
+          <div className="panel-head"><h2>Waiting for approval ({pendingApprovals.length})</h2><Link href="/app/approvals">Review all →</Link></div>
+          {pendingApprovals.slice(0, 3).map((a) => (
+            <div key={a.id} className="focus">
+              <div className="focus-body"><b>{a.title}</b><p>{a.description.slice(0, 100)}</p></div>
+              <Link href="/app/approvals">Review →</Link>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* 3-Step First-Run Checklist — collapses to one line when done */}
+      {stepsCompleted === 3 ? (
+        <p style={{ fontSize: 12, color: "#2d6325", margin: "16px 0 0" }}>✓ Workspace setup complete — files, coach, and project ready.</p>
+      ) : (
       <section className="panel" style={{ margin: "16px 0", background: "linear-gradient(to right, var(--color-paper), #faf7f2)", borderRadius: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <div>
@@ -64,7 +106,7 @@ export default async function AppHome() {
             </span>
             <h2 style={{ fontSize: 16, fontWeight: 800, margin: "2px 0 0" }}>Getting Started Checklist</h2>
           </div>
-          <span className="tag" style={{ background: stepsCompleted === 3 ? "#e4f0df" : "#fef3c7", color: stepsCompleted === 3 ? "#2d6325" : "#92400e", fontWeight: 700, fontSize: 11 }}>
+          <span className="tag" style={{ background: "#fef3c7", color: "#92400e", fontWeight: 700, fontSize: 11 }}>
             {stepsCompleted} of 3 completed
           </span>
         </div>
@@ -101,13 +143,7 @@ export default async function AppHome() {
           </Link>
         </div>
       </section>
-
-      <section className="stats">
-        <div className="stat"><div className="stat-top"><span>Study streak</span><span className="stat-icon">◒</span></div><strong>{tasks.length ? `${Math.min(tasks.length, 12)} days` : "Day 1"}</strong><small>{doneCount} tasks done</small></div>
-        <div className="stat"><div className="stat-top"><span>Project progress</span><span className="stat-icon">⌘</span></div><strong>{projects.length ? `${Math.round((projects[0].tasks.filter((t) => t.status === "completed").length / Math.max(projects[0].tasks.length, 1)) * 100)}%` : "—"}</strong><small>{projects.length} projects</small></div>
-        <div className="stat"><div className="stat-top"><span>Tasks completed</span><span className="stat-icon">✓</span></div><strong>{doneCount}</strong><small>{focus.length} in focus</small></div>
-        <div className="stat"><div className="stat-top"><span>Career matches</span><span className="stat-icon">↗</span></div><strong>{apps.length ? `${apps.length} saved` : "0 yet"}</strong><small>{interviews} interviewing · {soonApps} active</small></div>
-      </section>
+      )}
 
       <div className="columns">
         <section className="panel">
@@ -121,40 +157,15 @@ export default async function AppHome() {
             </div>
           ))}
         </section>
-        <section className="panel">
-          <div className="panel-head"><h2>Your agents</h2><Link href="/app/agents">Manage →</Link></div>
-          {agents.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No agents yet.</p>}
-          {agents.slice(0, 3).map((a) => {
-            const [icon, color] = agentIcon[a.template] ?? ["✦", "yellow"];
-            return (
-              <Link key={a.id} href={`/app/agents/${a.id}`} className="agent-row">
-                <div className={`agent-icon ${color}`}>{icon}</div>
-                <div><b>{a.name}</b><span>{a.role}</span></div>
-                <div className="status">● Ready</div>
-              </Link>
-            );
-          })}
-          <Link href="/app/agents" className="button" style={{ width: "100%", justifyContent: "center", marginTop: 16, padding: 10, fontSize: 12 }}>+ Add an agent</Link>
-        </section>
-      </div>
 
-      <div className="lower">
-        <section className="panel">
-          <div className="panel-head"><h2>Active projects</h2><Link href="/app/projects">View projects →</Link></div>
-          {projects.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No projects yet — add your major project.</p>}
-          {projects.map((p) => {
-            const pct = p.tasks.length ? Math.round((p.tasks.filter((t) => t.status === "completed").length / p.tasks.length) * 100) : 0;
-            return (
-              <Link key={p.id} href={`/app/projects/${p.id}`} className="project">
-                <div><h3>{p.name}</h3><p>{p.type} · {p.tasks.filter((t) => t.status !== "completed").length} tasks remaining</p><div className="bar"><i style={{ width: `${pct}%` }} /></div></div>
-                <b>{pct}%</b>
-              </Link>
-            );
-          })}
-        </section>
         <section className="panel">
           <div className="panel-head"><h2>Upcoming deadlines</h2><Link href="/app/tasks">Calendar →</Link></div>
-          {deadlines.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No dated tasks. Add due dates in the planner.</p>}
+          {overdue.length === 0 && deadlines.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No dated tasks. Add due dates in the planner.</p>}
+          {overdue.map((t) => (
+            <div key={t.id} className="deadline" style={{ borderLeft: "3px solid #c0392b", paddingLeft: 8 }}>
+              <div><b>Overdue: {t.title}</b><span>Was due {new Date(t.dueDate!).toLocaleDateString()} · <Link href="/app/tasks">Reschedule →</Link></span></div>
+            </div>
+          ))}
           {deadlines.map((t) => {
             const d = new Date(t.dueDate!);
             return (
@@ -168,15 +179,46 @@ export default async function AppHome() {
       </div>
 
       <section className="panel" style={{ marginTop: 18 }}>
+        <div className="panel-head"><h2>Active projects</h2><Link href="/app/projects">View projects →</Link></div>
+        {projects.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>No projects yet — add your major project.</p>}
+        {projects.slice(0, 2).map((p) => {
+          const pct = p.tasks.length ? Math.round((p.tasks.filter((t) => t.status === "completed").length / p.tasks.length) * 100) : 0;
+          return (
+            <Link key={p.id} href={`/app/projects/${p.id}`} className="project">
+              <div><h3>{p.name}</h3><p>{p.type} · {p.tasks.filter((t) => t.status !== "completed").length} tasks remaining</p><div className="bar"><i style={{ width: `${pct}%` }} /></div></div>
+              <b>{pct}%</b>
+            </Link>
+          );
+        })}
+      </section>
+
+      {/* Quick capture */}
+      <section className="panel" style={{ margin: "16px 0" }}>
+        <div className="panel-head"><h2>Quick capture</h2></div>
+        <QuickCapture />
+      </section>
+
+      {/* Top priorities — agent recommendations, separate from user tasks */}
+      <section className="panel" style={{ margin: "16px 0" }}>
+        <div className="panel-head"><h2>Top priorities</h2><span style={{ fontSize: 11, color: "var(--color-muted)" }}>Suggested by your workspace</span></div>
+        <Recommendations compact />
+      </section>
+
+      <section className="panel" style={{ marginTop: 18 }}>
         <div className="panel-head"><h2>Recent activity</h2><Link href="/app/files">Open files & notes →</Link></div>
-        {files.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>Upload notes and Study Coach will build your first plan here.</p>}
-        {files.slice(0, 2).map((f) => (
-          <div key={f.id} className="focus">
-            <div className="agent-icon yellow">◒</div>
-            <div className="focus-body"><b>{f.name}</b><p>{f.status} · {Math.round(f.size / 1024)} KB</p></div>
-            <Link href="/app/files">Open →</Link>
-          </div>
-        ))}
+          {activity.length === 0 && files.length === 0 && <p style={{ fontSize: 13, color: "var(--color-muted)" }}>Upload notes and Study Coach will build your first plan here.</p>}
+          {activity.slice(0, 4).map((e) => (
+            <div key={e.id} className="focus">
+              <div className="focus-body"><b>{e.action.replace(/_/g, " ")}</b><p>{new Date(e.createdAt).toLocaleString()}</p></div>
+            </div>
+          ))}
+          {files.slice(0, 2).map((f) => (
+            <div key={f.id} className="focus">
+              <div className="agent-icon yellow">◒</div>
+              <div className="focus-body"><b>{f.name}</b><p>{f.status} · {Math.round(f.size / 1024)} KB</p></div>
+              <Link href="/app/files">Open →</Link>
+            </div>
+          ))}
       </section>
     </>
   );

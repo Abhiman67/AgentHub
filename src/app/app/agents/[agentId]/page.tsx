@@ -1,12 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ApprovalCard } from "@/components/ApprovalCard";
 import { RunPanel } from "@/components/RunPanel";
 import { ChatMessage } from "@/components/ChatMessage";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { ConfirmDialog, PromptDialog, Dialog } from "@/components/Dialog";
+import Dropdown from "@/components/Dropdown";
 import { SUGGESTED_PROMPTS } from "@/lib/agents";
 
 type Msg = { role: string; content: string };
@@ -39,6 +40,7 @@ const PROMPT_DETAILS: Record<string, { desc: string }> = {
 
 export default function ChatPage() {
   const { agentId } = useParams() as { agentId: string };
+  const searchParams = useSearchParams();
   const [agent, setAgent] = useState<{ id: string; name: string; role: string; template: string } | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [convId, setConvId] = useState(() =>
@@ -57,6 +59,8 @@ export default function ChatPage() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [savingTitle, setSavingTitle] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Notice | null>(null);
 
@@ -64,13 +68,22 @@ export default function ChatPage() {
   const abort = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const reloadProjects = useCallback(async () => {
+    const res = await fetch("/api/projects");
+    if (res.ok) {
+      const d = await res.json();
+      setProjects(d.projects ?? []);
+    }
+  }, []);
+
   useEffect(() => {
     fetch("/api/agents").then((r) => r.json()).then((d) => {
       setAgent((d.agents ?? []).find((a: { id: string }) => a.id === agentId) ?? null);
     });
-    fetch("/api/projects").then((r) => r.json()).then((d) => setProjects(d.projects ?? []));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void reloadProjects();
     fetch("/api/files").then((r) => r.json()).then((d) => setFiles((d.files ?? []).slice(0, 5)));
-  }, [agentId]);
+  }, [agentId, reloadProjects]);
 
   const loadList = useCallback(async () => {
     const res = await fetch(`/api/agents/${agentId}/conversations`);
@@ -91,6 +104,39 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadList(); }, [loadList]);
 
+  async function attachProject(nextProj: string) {
+    if (nextProj === "__new__") {
+      setShowNewProjectModal(true);
+      return;
+    }
+    setProjectId(nextProj);
+    if (convId) {
+      await fetch(`/api/conversations/${convId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: nextProj || null }),
+      });
+    }
+  }
+
+  async function createProject(name: string) {
+    setCreatingProject(true);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) return;
+      const d = await res.json();
+      await reloadProjects();
+      setShowNewProjectModal(false);
+      if (d.project?.id) await attachProject(d.project.id);
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (convId) loadConv(convId);
@@ -100,6 +146,13 @@ export default function ChatPage() {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
 
+  // Prefill the composer from dashboard handoffs (?q=). Consumed once.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (q) setInput(q.slice(0, 2000));
+  }, [searchParams]);
+
   const [icon, color, support] = agent ? META[agent.template] ?? ["✦", "yellow", "Online"] : ["✦", "yellow", "Online"];
 
   // Synchronize active conversation with URL ?c= parameter, falling back to localStorage
@@ -107,12 +160,15 @@ export default function ChatPage() {
     if (typeof window !== "undefined") {
       const urlConv = new URLSearchParams(window.location.search).get("c");
       if (urlConv) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setConvId(urlConv);
         return;
       }
     }
     const saved = localStorage.getItem(`conv:${agentId}`);
-    if (saved) setConvId(saved);
+    if (saved) {
+      setConvId(saved);
+    }
   }, [agentId]);
 
   async function select(id: string) {
@@ -271,7 +327,7 @@ export default function ChatPage() {
           <span className="claude-shortcut-badge">⌘N</span>
         </button>
 
-        <div className="label" style={{ margin: "0 6px 8px", color: "#a59f93" }}>Recent Chats</div>
+        <div className="label" style={{ margin: "0 6px 8px" }}>Recent Chats</div>
         <nav className="claude-nav-list">
           {convs.slice(0, 20).map((c) => (
             <a
@@ -295,14 +351,12 @@ export default function ChatPage() {
             <button
               onClick={() => setShowRenameModal(true)}
               className="tag"
-              style={{ cursor: "pointer", border: 0, fontSize: 11 }}
             >
               Rename
             </button>
             <button
               onClick={() => setShowDeleteModal(true)}
-              className="tag"
-              style={{ cursor: "pointer", border: 0, fontSize: 11, color: "#c0392b" }}
+              className="tag danger"
             >
               Delete
             </button>
@@ -311,8 +365,8 @@ export default function ChatPage() {
 
         <Link
           href="/app/agents"
-          className="button light"
-          style={{ width: "100%", marginTop: 14, fontSize: 12, padding: "8px", justifyContent: "center", flexShrink: 0 }}
+          className="button light sm"
+          style={{ width: "100%", marginTop: 14 }}
         >
           ← All agents
         </Link>
@@ -346,7 +400,7 @@ export default function ChatPage() {
               className={`claude-toggle-btn ${showContext ? "active" : ""}`}
               title="Toggle Project Context & Notes"
             >
-              <span>◫</span> {showContext ? "Hide Context" : "Project Context"}
+              {showContext ? "Hide Context" : "Project Context"}
             </button>
           </div>
         </header>
@@ -437,10 +491,10 @@ export default function ChatPage() {
                         key={idx}
                         type="button"
                         onClick={() => setSelectedCitation(n)}
-                        className="inline-flex items-center gap-1 rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-brand/10 hover:text-brand px-2 py-0.5 text-[11px] font-medium transition cursor-pointer border border-line"
+                        className="tag"
                         title="Click to inspect cited source"
                       >
-                        📄 {n.label}
+                        {n.label}
                       </button>
                     ))}
                 </span>
@@ -452,14 +506,7 @@ export default function ChatPage() {
                 {error}{" "}
                 <button
                   onClick={() => send(lastPrompt)}
-                  style={{
-                    textDecoration: "underline",
-                    fontWeight: 700,
-                    background: "none",
-                    border: 0,
-                    cursor: "pointer",
-                    color: "inherit",
-                  }}
+                  className="tag"
                 >
                   Retry
                 </button>
@@ -509,36 +556,16 @@ export default function ChatPage() {
                   <span>{icon}</span> {agent?.name}
                 </span>
 
-                <select
+                <Dropdown
                   value={projectId}
-                  onChange={async (e) => {
-                    const nextProj = e.target.value;
-                    setProjectId(nextProj);
-                    if (convId) {
-                      await fetch(`/api/conversations/${convId}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ projectId: nextProj || null }),
-                      });
-                    }
-                  }}
-                  style={{
-                    fontSize: 11,
-                    padding: "3px 8px",
-                    borderRadius: 999,
-                    border: "1px solid var(--color-line)",
-                    background: "#ffffff",
-                    color: "var(--color-ink)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="">No Project</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      ▣ {p.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "No project" },
+                    ...projects.map((p) => ({ value: p.id, label: p.name })),
+                    { value: "__new__", label: "+ New project…" },
+                  ]}
+                  onChange={(nextProj) => void attachProject(nextProj)}
+                  label="Project"
+                />
               </div>
 
               <div className="claude-toolbar-right">
@@ -550,21 +577,21 @@ export default function ChatPage() {
                   <button
                     type="button"
                     onClick={() => abort.current?.abort()}
-                    className="claude-stop-btn flex items-center gap-1 font-semibold text-xs px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"
+                    className="button secondary sm"
                     title="Stop generating response"
                     aria-label="Stop generation"
                   >
-                    <span>■</span> Stop
+                    Stop
                   </button>
                 ) : (
                   <button
                     type="submit"
                     disabled={!input.trim()}
-                    className="claude-send-btn"
+                    className="button primary sm"
                     title="Send message"
                     aria-label="Send message"
                   >
-                    ↑
+                    Send
                   </button>
                 )}
               </div>
@@ -581,9 +608,10 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setShowContext(false)}
-              style={{ background: "none", border: 0, fontSize: 16, cursor: "pointer", color: "var(--color-muted)" }}
+              className="tag"
+              aria-label="Close context panel"
             >
-              ×
+              Close
             </button>
           </div>
 
@@ -594,37 +622,16 @@ export default function ChatPage() {
           <label htmlFor="drawer-project" className="sr-only">
             Active project
           </label>
-          <select
-            id="drawer-project"
+          <Dropdown
             value={projectId}
-            onChange={async (e) => {
-              const nextProj = e.target.value;
-              setProjectId(nextProj);
-              if (convId) {
-                await fetch(`/api/conversations/${convId}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ projectId: nextProj || null }),
-                });
-              }
-            }}
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              border: "1px solid var(--color-line)",
-              borderRadius: 8,
-              fontSize: 12,
-              background: "#ffffff",
-              marginBottom: 16,
-            }}
-          >
-            <option value="">No project attached</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                ▣ {p.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "No project attached" },
+              ...projects.map((p) => ({ value: p.id, label: p.name })),
+              { value: "__new__", label: "+ New project…" },
+            ]}
+            onChange={(nextProj) => void attachProject(nextProj)}
+            label="Active project"
+          />
 
           <h3>Attached Files & Notes</h3>
           {files.length === 0 ? (
@@ -665,6 +672,19 @@ export default function ChatPage() {
         loading={deleting}
       />
 
+      {/* New Project Prompt Dialog */}
+      <PromptDialog
+        isOpen={showNewProjectModal}
+        onClose={() => setShowNewProjectModal(false)}
+        onSubmit={(name) => void createProject(name)}
+        title="New project"
+        description="Name it and keep chatting — it attaches to this conversation automatically."
+        placeholder="e.g., Semester 6 Major Project"
+        submitText="Create project"
+        cancelText="Cancel"
+        loading={creatingProject}
+      />
+
       {/* Rename Chat Prompt Dialog */}
       <PromptDialog
         isOpen={showRenameModal}
@@ -687,32 +707,32 @@ export default function ChatPage() {
           title="Cited Document Source"
           description="This reference material was used by the agent to substantiate its response."
         >
-          <div className="space-y-3 py-2 text-xs">
-            <div className="rounded-xl border border-line bg-card p-3">
-              <div className="text-[11px] text-muted font-semibold uppercase tracking-wider">Document Name</div>
-              <div className="font-bold text-foreground text-sm mt-0.5">{selectedCitation.label}</div>
-              {selectedCitation.sourceId && (
-                <div className="text-[10px] font-mono text-muted mt-1">ID: {selectedCitation.sourceId}</div>
-              )}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="tag">{selectedCitation.label}</span>
             </div>
-            <p className="text-muted leading-relaxed">
-              AgentHub matched excerpts from this file against your prompt using semantic chunk retrieval. You can inspect or manage all your course notes in the Files workspace.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
+            {selectedCitation.sourceId && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "var(--color-muted)" }}>ID: {selectedCitation.sourceId}</div>
+            )}
+          </div>
+          <p className="dialog-desc">
+            Backoff matched excerpts from this file against your prompt using semantic chunk retrieval. You can inspect or manage all your course notes in the Files workspace.
+          </p>
+          <div className="dialog-actions">
               <Link
                 href="/app/files"
-                className="rounded-xl bg-brand px-3.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
+                className="dialog-btn-confirm brand"
+                style={{ textDecoration: "none" }}
               >
                 Go to Files & Notes
               </Link>
               <button
                 onClick={() => setSelectedCitation(null)}
-                className="rounded-xl border border-line px-3 py-1.5 text-xs font-medium"
+                className="dialog-btn-cancel"
               >
                 Close
               </button>
             </div>
-          </div>
         </Dialog>
       )}
     </div>

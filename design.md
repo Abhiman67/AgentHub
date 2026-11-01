@@ -1,6 +1,6 @@
-# AgentHub Design Specification
+# Backoff Design Specification
 
-**Product:** AgentHub  
+**Product:** Backoff  
 **Version:** 1.0  
 **Audience:** Students, student teams, colleges and campus communities  
 **Product type:** Multi-agent AI SaaS platform  
@@ -8,7 +8,7 @@
 
 ## 1. Product vision
 
-AgentHub is a student operating system powered by specialized AI agents. Instead of asking one generic chatbot to do everything, a student creates a focused team: Study Coach, Project Guide, Career Scout, Code Mentor, Writing Buddy and Interview Coach.
+Backoff is a student operating system powered by specialized AI agents. Instead of asking one generic chatbot to do everything, a student creates a focused team: Study Coach, Project Guide, Career Scout, Code Mentor, Writing Buddy and Interview Coach.
 
 The product should feel like a calm, intelligent workspace—not like an intimidating developer tool. It should turn vague student goals into visible next actions while preserving student control over generated work and external actions.
 
@@ -60,7 +60,7 @@ Landing page
 ### Authenticated application
 
 ```text
-AgentHub workspace
+Backoff workspace
 ├── Overview
 ├── My agents
 │   ├── Agent directory
@@ -87,7 +87,7 @@ AgentHub workspace
 
 ### Personality
 
-Warm, confident, focused, optimistic and slightly editorial. AgentHub should feel more like a thoughtful studio than a generic AI dashboard.
+Warm, confident, focused, optimistic and slightly editorial. Backoff should feel more like a thoughtful studio than a generic AI dashboard.
 
 ### Layout style
 
@@ -97,7 +97,7 @@ Warm, confident, focused, optimistic and slightly editorial. AgentHub should fee
 - Rounded cards with restrained borders
 - Playful agent colors used as functional categories
 - Dark navy sections for contrast and focus
-- Orange used for action and energy, not decoration everywhere
+- Forest green used for action and trust, with gold reserved for highlights
 
 ### Brand language
 
@@ -125,7 +125,8 @@ Avoid overly technical copy:
 | Paper | `#F7F5F0` | Main page background |
 | Card | `#FFFDF9` | Cards and elevated surfaces |
 | Line | `#E6E1D7` | Borders and dividers |
-| Orange | `#FF7048` | Primary brand action, emphasis |
+| Forest green | `#06402B` | Primary brand action, emphasis, trust |
+| Gold | `#FFD34D` | Logo highlight and small emphasis |
 | Yellow | `#F4D35E` | Study Coach category |
 | Sky | `#9BD8E5` | Project Guide category |
 | Green | `#B7DCB2` | Career Scout category |
@@ -170,7 +171,7 @@ font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
 
 #### Header
 
-- AgentHub logo and wordmark on the left
+- Backoff logo and wordmark on the left
 - Navigation: Agents, Dashboard preview, How it works, Pricing
 - Sign in button on the right
 - Sticky on desktop after scrolling
@@ -184,7 +185,7 @@ Headline:
 
 Supporting text:
 
-> AgentHub gives every student a personal team of AI agents to study smarter, build better projects, and find their next opportunity.
+> Backoff gives every student a personal team of AI agents to study smarter, build better projects, and find their next opportunity.
 
 Primary action: **Build your team**  
 Secondary action: **Meet the agents**
@@ -208,9 +209,9 @@ Each card contains an icon, title, one-sentence description and category color.
 
 Three steps:
 
-1. Tell AgentHub where you want to go.
+1. Tell Backoff where you want to go.
 2. Choose and configure your AI team.
-3. Let the work compound through daily progress.
+3. Let the work backoff through daily progress.
 
 #### Student proof
 

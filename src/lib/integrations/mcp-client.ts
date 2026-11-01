@@ -48,10 +48,14 @@ function gatedAdapter(provider: string, caps: Capability[], requiredScopes: stri
           });
           if (!acct) return { ok: false, error: "Provider not connected" };
           let granted: string[] = [];
-          try {
-            granted = JSON.parse(acct.scopes || "[]");
-          } catch {
-            granted = [];
+          const rawScopes = acct.scopes as unknown;
+          if (Array.isArray(rawScopes)) granted = rawScopes.map(String);
+          else {
+            try {
+              granted = JSON.parse((rawScopes as string) || "[]");
+            } catch {
+              granted = [];
+            }
           }
           assertScopes(granted, requiredScopes);
           if (acct.expiresAt && acct.expiresAt.getTime() < Date.now()) return { ok: false, error: "Token expired, reconnect" };

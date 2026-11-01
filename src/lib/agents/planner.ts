@@ -3,6 +3,7 @@ import type { PlanStep } from "./types";
 
 export const MAX_STEPS_PER_RUN = 8;
 export const MAX_TOOL_CALLS_PER_STEP = 1;
+export const MAX_GOAL_CHARS = 1000;
 
 const planStepSchema = z.object({
   title: z.string().min(1).max(120),
@@ -75,7 +76,9 @@ function templateForGoal(goal: string): PlanStep[] {
 }
 
 export function buildPlan(goal: string): PlanStep[] {
-  const steps = templateForGoal(goal).slice(0, MAX_STEPS_PER_RUN);
+  if (!goal || !goal.trim()) throw new Error("Empty goal");
+  const bounded = goal.trim().slice(0, MAX_GOAL_CHARS);
+  const steps = templateForGoal(bounded).slice(0, MAX_STEPS_PER_RUN);
   const parsed = planSchema.parse(steps);
   for (const s of parsed) {
     if (s.kind === "tool") {

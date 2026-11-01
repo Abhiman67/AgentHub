@@ -9,6 +9,11 @@ const crumbs: Record<string, string> = {
   "/app/agents": "My agents",
   "/app/projects": "Projects",
   "/app/tasks": "Tasks",
+  "/app/progress": "Progress",
+  "/app/knowledge": "Knowledge",
+  "/app/responsibilities": "Routines",
+  "/app/notifications": "Notifications",
+  "/app/learning": "Learning",
   "/app/files": "Files & notes",
   "/app/career": "Career",
   "/app/usage": "Usage & plan",
@@ -34,6 +39,8 @@ const SEARCH_ITEMS: QuickItem[] = [
   { title: "Interview Coach", category: "Agents", href: "/app/agents", icon: "☼" },
   { title: "Projects & Milestones", category: "Workspace", href: "/app/projects", icon: "▣" },
   { title: "Tasks & Planner", category: "Workspace", href: "/app/tasks", icon: "✓" },
+  { title: "Progress & Review", category: "Workspace", href: "/app/progress", icon: "↗" },
+  { title: "Knowledge & Sources", category: "Workspace", href: "/app/knowledge", icon: "↥" },
   { title: "Files & Notes (Flashcards, Quizzes)", category: "Workspace", href: "/app/files", icon: "↥" },
   { title: "Usage, Limits & Plan", category: "Settings", href: "/app/usage", icon: "◧" },
   { title: "Profile & Education Settings", category: "Settings", href: "/app/settings/profile", icon: "◈" },
@@ -212,6 +219,13 @@ export default function Topbar({ tag }: { tag: string }) {
                 )}
 
                 <div style={{ borderTop: "1px solid var(--color-line)", marginTop: 12, paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
+                  <Link
+                    href="/app/notifications"
+                    onClick={() => setNotifOpen(false)}
+                    style={{ fontSize: 11, color: "var(--color-brand)", fontWeight: 700, textDecoration: "none" }}
+                  >
+                    All notifications →
+                  </Link>
                   <Link
                     href="/app/tasks"
                     onClick={() => setNotifOpen(false)}

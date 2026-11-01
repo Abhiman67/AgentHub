@@ -58,7 +58,8 @@ export default function ApprovalsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData();
   }, []);
 
   async function handleAction(id: string, action: "approve" | "deny") {
@@ -106,9 +107,10 @@ export default function ApprovalsPage() {
     }
   }
 
+  const approvals = data?.approvals;
   const filteredApprovals = useMemo(() => {
-    if (!data?.approvals) return [];
-    return data.approvals.filter((a) => {
+    if (!approvals) return [];
+    return approvals.filter((a) => {
       const matchesTab = activeTab === "all" ? true : a.status === activeTab;
       if (!matchesTab) return false;
       if (!searchQuery.trim()) return true;
@@ -119,35 +121,18 @@ export default function ApprovalsPage() {
         a.agentId.toLowerCase().includes(q)
       );
     });
-  }, [data?.approvals, activeTab, searchQuery]);
+  }, [approvals, activeTab, searchQuery]);
 
   function renderStatusBadge(status: Approval["status"]) {
     switch (status) {
       case "pending":
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Pending Review
-          </span>
-        );
+        return <span className="tag">Pending review</span>;
       case "approved":
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-            ✓ Approved
-          </span>
-        );
+        return <span className="tag">Approved</span>;
       case "denied":
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-500/20">
-            ✕ Denied
-          </span>
-        );
+        return <span className="tag">Denied</span>;
       case "expired":
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-500/10 px-2.5 py-0.5 text-xs font-semibold text-neutral-500 border border-neutral-500/20">
-            ⧗ Expired (7d TTL)
-          </span>
-        );
+        return <span className="tag">Expired (7d TTL)</span>;
     }
   }
 
@@ -162,69 +147,64 @@ export default function ApprovalsPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-line pb-6">
+      <div className="page-head">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Approvals & Safety</h1>
-            <span className="rounded-md bg-brand/10 text-brand px-2 py-0.5 text-xs font-semibold border border-brand/20">
-              WP2 & EA4 Compliant
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted">
+          <h1>Approvals and safety</h1>
+          <p>
             Human-in-the-loop governance: AI agents cannot modify your calendar, tasks, or files without your explicit approval.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             onClick={loadData}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3.5 py-2 text-xs font-medium text-foreground hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+            className="button secondary sm"
           >
-            ↻ Refresh
+            Refresh
           </button>
         </div>
       </div>
 
       {/* Metrics Banner */}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-2xl border border-line bg-card p-4">
-          <div className="text-xs font-medium text-muted">Pending Review</div>
-          <div className="mt-1 text-2xl font-extrabold text-amber-500 flex items-center gap-2">
+        <div className="card">
+          <div className="text-xs font-medium text-muted">Pending review</div>
+          <div className="mt-1 text-2xl font-extrabold flex items-center gap-2">
             {data?.stats.pending ?? 0}
             {(data?.stats.pending ?? 0) > 0 && (
-              <span className="text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+              <span className="tag">
                 Action required
               </span>
             )}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-card p-4">
-          <div className="text-xs font-medium text-muted">Approved Actions</div>
-          <div className="mt-1 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
+        <div className="card">
+          <div className="text-xs font-medium text-muted">Approved actions</div>
+          <div className="mt-1 text-2xl font-extrabold">
             {data?.stats.approved ?? 0}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-card p-4">
-          <div className="text-xs font-medium text-muted">Denied / Blocked</div>
-          <div className="mt-1 text-2xl font-extrabold text-rose-500">
+        <div className="card">
+          <div className="text-xs font-medium text-muted">Denied / blocked</div>
+          <div className="mt-1 text-2xl font-extrabold">
             {data?.stats.denied ?? 0}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-card p-4">
-          <div className="text-xs font-medium text-muted">Safety Policy</div>
-          <div className="mt-1 text-lg font-bold text-foreground flex items-center gap-1.5">
-            <span className="text-emerald-500">●</span> 100% Guarded
+        <div className="card">
+          <div className="text-xs font-medium text-muted">Safety policy</div>
+          <div className="mt-1 text-lg font-bold flex items-center gap-1.5">
+            100% guarded
           </div>
-          <div className="text-[11px] text-muted">7-Day TTL Auto-Expiry</div>
+          <div className="text-[11px] text-muted">7-day TTL auto-expiry</div>
         </div>
       </div>
 
       {/* Filter Tabs & Search */}
       <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-1 overflow-x-auto pb-2 sm:pb-0 border-b sm:border-b-0 border-line">
+        <div className="filter-pills" role="tablist" aria-label="Approval filters" style={{ marginBottom: 0 }}>
           {(
             [
               { id: "pending", label: "Pending", count: data?.stats.pending },
@@ -232,42 +212,32 @@ export default function ApprovalsPage() {
               { id: "approved", label: "Approved", count: data?.stats.approved },
               { id: "denied", label: "Denied", count: data?.stats.denied },
               { id: "expired", label: "Expired", count: data?.stats.expired },
-              { id: "audit", label: "Audit Trail", count: data?.auditLogs?.length },
+              { id: "audit", label: "Audit trail", count: data?.auditLogs?.length },
             ] as const
           ).map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
-                activeTab === tab.id
-                  ? "bg-foreground text-background font-semibold"
-                  : "text-muted hover:text-foreground hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              }`}
+              className={activeTab === tab.id ? "on" : ""}
             >
               {tab.label}
-              {typeof tab.count === "number" && (
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    activeTab === tab.id
-                      ? "bg-background/20 text-background"
-                      : "bg-neutral-200 dark:bg-neutral-800 text-muted"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
+              {typeof tab.count === "number" && ` (${tab.count})`}
             </button>
           ))}
         </div>
 
         {activeTab !== "audit" && (
           <div className="relative">
+            <label htmlFor="approval-search" className="sr-only">Search approvals</label>
             <input
+              id="approval-search"
               type="text"
               placeholder="Search approvals..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full sm:w-64 rounded-xl border border-line bg-card px-3 py-1.5 text-xs text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+              className="qa-control"
             />
           </div>
         )}
@@ -275,17 +245,18 @@ export default function ApprovalsPage() {
 
       {/* Loading & Error States */}
       {loading && (
-        <div className="mt-8 rounded-2xl border border-line bg-card p-12 text-center text-sm text-muted">
-          Loading approval records and safety policies...
+        <div className="panel" style={{ marginTop: 32, textAlign: "center" }}>
+          <p className="text-sm text-muted">Loading approval records and safety policies...</p>
         </div>
       )}
 
       {error && !loading && (
-        <div className="mt-8 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</p>
+        <div className="panel" style={{ marginTop: 32, textAlign: "center" }}>
+          <p className="text-sm font-medium">{error}</p>
           <button
             onClick={loadData}
-            className="mt-3 rounded-xl bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
+            className="button primary sm"
+            style={{ marginTop: 12 }}
           >
             Retry
           </button>
@@ -294,21 +265,23 @@ export default function ApprovalsPage() {
 
       {/* Audit Trail View */}
       {!loading && !error && activeTab === "audit" && (
-        <div className="mt-6 rounded-2xl border border-line bg-card overflow-hidden">
-          <div className="p-4 border-b border-line bg-neutral-50/50 dark:bg-neutral-900/50 flex items-center justify-between">
+        <div className="panel" style={{ marginTop: 24, padding: 0, overflow: "hidden" }}>
+          <div className="panel-head" style={{ padding: "16px 16px 0" }}>
             <div>
-              <h2 className="text-sm font-bold">Security Audit Log</h2>
+              <h2>Security audit log</h2>
               <p className="text-xs text-muted">Immutable event records capturing agent proposals, approvals, and guardrail events.</p>
             </div>
-            <span className="text-xs text-muted">{data?.auditLogs?.length ?? 0} events recorded</span>
+            <span className="tag">{data?.auditLogs?.length ?? 0} events</span>
           </div>
 
           {!data?.auditLogs || data.auditLogs.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted">
-              No audit events recorded yet. Approving or denying actions will populate this log.
+            <div style={{ padding: 32, textAlign: "center" }}>
+              <p className="text-sm text-muted">
+                No audit events recorded yet. Approving or denying actions will populate this log.
+              </p>
             </div>
           ) : (
-            <div className="divide-y divide-line text-xs">
+            <div style={{ marginTop: 8 }}>
               {data.auditLogs.map((log) => {
                 let parsedMeta: Record<string, unknown> = {};
                 try {
@@ -316,23 +289,23 @@ export default function ApprovalsPage() {
                 } catch {}
 
                 return (
-                  <div key={log.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-neutral-50 dark:hover:bg-neutral-900/40 transition">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold uppercase tracking-wider text-[10px] rounded bg-neutral-200 dark:bg-neutral-800 px-1.5 py-0.5">
+                  <div key={log.id} className="list-row" style={{ padding: "16px" }}>
+                    <div className="grow">
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className="tag">
                           {log.action}
                         </span>
-                        <span className="text-muted">
+                        <span className="text-muted" style={{ fontSize: 12 }}>
                           {new Date(log.createdAt).toLocaleString()}
                         </span>
                       </div>
                       {parsedMeta.executionResult ? (
-                        <p className="mt-1 text-foreground font-medium">{String(parsedMeta.executionResult)}</p>
+                        <p className="mt-1 font-medium" style={{ fontSize: 12 }}>{String(parsedMeta.executionResult)}</p>
                       ) : (
-                        <p className="mt-1 text-muted font-mono text-[11px]">{log.metadata}</p>
+                        <p className="mt-1 text-muted" style={{ fontSize: 11 }}>{log.metadata}</p>
                       )}
                     </div>
-                    <div className="text-[11px] text-muted self-start sm:self-center">
+                    <div className="text-[11px] text-muted">
                       ID: {log.id.slice(-8)}
                     </div>
                   </div>
@@ -347,41 +320,39 @@ export default function ApprovalsPage() {
       {!loading && !error && activeTab !== "audit" && (
         <div className="mt-6 space-y-4">
           {actionNotice && (
-            <div
-              className={`rounded-xl p-3.5 text-xs font-medium flex items-center justify-between ${
-                actionNotice.type === "success"
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
-              }`}
-            >
-              <span>{actionNotice.msg}</span>
-              <button
-                onClick={() => setActionNotice(null)}
-                className="opacity-70 hover:opacity-100 ml-4 font-bold"
-              >
-                ✕
-              </button>
+            <div className="panel" style={{ padding: "14px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{actionNotice.msg}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionNotice(null)}
+                  className="tag"
+                  aria-label="Dismiss notice"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
 
           {filteredApprovals.length === 0 ? (
-            <div className="rounded-3xl border border-line bg-card p-12 text-center">
-              <div className="text-3xl mb-2">🛡️</div>
-              <h3 className="text-base font-bold text-foreground">
+            <div className="card" style={{ padding: 48, textAlign: "center" }}>
+              <h3 className="text-base font-bold">
                 {activeTab === "pending"
                   ? "Zero pending approvals"
                   : `No ${activeTab} approvals found`}
               </h3>
-              <p className="mt-1 text-xs text-muted max-w-md mx-auto">
+              <p className="mt-1 text-xs text-muted" style={{ maxWidth: 448, margin: "4px auto 0" }}>
                 {activeTab === "pending"
                   ? "All clear! Your AI agents are operating safely within read-only boundaries. When an agent proposes an external action or creates tasks, it will appear here for your sign-off."
                   : "Try switching to another tab or asking an agent to plan a task."}
               </p>
               <Link
                 href="/app/agents"
-                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition"
+                className="button primary sm"
+                style={{ marginTop: 16 }}
               >
-                Open Agents Workspace
+                Open agents workspace
               </Link>
             </div>
           ) : (
@@ -393,45 +364,47 @@ export default function ApprovalsPage() {
               return (
                 <div
                   key={approval.id}
-                  className="rounded-2xl border border-line bg-card p-5 transition hover:shadow-sm"
+                  className="card"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         {renderStatusBadge(approval.status)}
                         <span className="text-xs text-muted font-medium">
-                          Agent: <span className="text-foreground font-semibold">{approval.agentId}</span>
+                          Agent: <span className="font-semibold">{approval.agentId}</span>
                         </span>
                         <span className="text-xs text-muted">·</span>
                         <span className="text-xs text-muted">
                           Created {new Date(approval.createdAt).toLocaleDateString()}
                         </span>
                         {approval.status === "pending" && (
-                          <span className="rounded-md bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[11px] font-mono text-muted">
+                          <span className="tag">
                             TTL: {ttlRemaining}
                           </span>
                         )}
                       </div>
-                      <h3 className="text-base font-bold text-foreground pt-1">{approval.title}</h3>
+                      <h3 className="text-base font-bold pt-1">{approval.title}</h3>
                       <p className="text-xs text-muted leading-relaxed">{approval.description}</p>
                     </div>
 
                     {/* Action Controls for Pending Approvals */}
                     {approval.status === "pending" && (
-                      <div className="flex items-center gap-2 self-end sm:self-start shrink-0 pt-2 sm:pt-0">
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         <button
+                          type="button"
                           onClick={() => handleAction(approval.id, "deny")}
                           disabled={isActing}
-                          className="rounded-xl border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-50 transition"
+                          className="button secondary sm"
                         >
                           {isActing ? "Processing..." : "Deny"}
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleAction(approval.id, "approve")}
                           disabled={isActing}
-                          className="rounded-xl bg-brand px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 transition shadow-sm"
+                          className="button primary sm"
                         >
-                          {isActing ? "Processing..." : "Approve Action"}
+                          {isActing ? "Processing..." : "Approve action"}
                         </button>
                       </div>
                     )}
@@ -439,33 +412,33 @@ export default function ApprovalsPage() {
 
                   {/* Proposed Action Inspection Details */}
                   {payload && (
-                    <div className="mt-4 rounded-xl border border-line/60 bg-neutral-50/50 dark:bg-neutral-900/40 p-3.5 text-xs">
+                    <div className="card" style={{ marginTop: 16, background: "var(--color-paper)" }}>
                       <div className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">
-                        Proposed System State Change:
+                        Proposed system state change:
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" style={{ fontSize: 12 }}>
                         <div>
-                          <span className="text-muted">Action Type: </span>
-                          <span className="font-mono font-semibold text-foreground">
+                          <span className="text-muted">Action type: </span>
+                          <span className="font-semibold">
                             {payload.type ?? "state_change"}
                           </span>
                         </div>
                         {payload.title && (
                           <div className="sm:col-span-2">
-                            <span className="text-muted">Target Item: </span>
-                            <span className="font-medium text-foreground">{payload.title}</span>
+                            <span className="text-muted">Target item: </span>
+                            <span className="font-medium">{payload.title}</span>
                           </div>
                         )}
                         {payload.priority && (
                           <div>
                             <span className="text-muted">Priority: </span>
-                            <span className="capitalize font-medium text-foreground">{payload.priority}</span>
+                            <span className="capitalize font-medium">{payload.priority}</span>
                           </div>
                         )}
                         {payload.dueDate && (
                           <div>
-                            <span className="text-muted">Due Date: </span>
-                            <span className="font-medium text-foreground">
+                            <span className="text-muted">Due date: </span>
+                            <span className="font-medium">
                               {new Date(payload.dueDate).toLocaleDateString()}
                             </span>
                           </div>

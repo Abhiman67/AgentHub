@@ -1,33 +1,24 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { handleApi, notFound } from "@/lib/api";
 
-async function uid() {
-  const s = await auth();
-  if (!s?.user?.email) return null;
-  const u = await db.user.findUnique({ where: { email: s.user.email } });
-  return u?.id ?? null;
-}
-
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const ownerId = await uid();
-  if (!ownerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const file = await db.file.findFirst({ where: { id, ownerId } });
-  if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const GET = handleApi<{ id: string }>(async (_req, { userId: ownerId }, params) => {
+  const { id } = params;
+  const file = await db.file.findFirst({ where: { id, ownerId, status: { not: "deleted" } } });
+  if (!file) throw notFound("File");
   return NextResponse.json({ file });
-}
+});
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const ownerId = await uid();
-  if (!ownerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const file = await db.file.findFirst({ where: { id, ownerId } });
-  if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
+export const DELETE = handleApi<{ id: string }>(async (_req, { userId: ownerId }, params) => {
+  const { id } = params;
+  const file = await db.file.findFirst({ where: { id, ownerId, status: { not: "deleted" } } });
+  if (!file) throw notFound("File");
+  // Soft delete: keep the row for audit, drop bytes + chunks.
   if (file.storageKey) {
     const { objectStorage } = await import("@/lib/storage");
     await objectStorage.del(file.storageKey);
   }
-  await db.file.delete({ where: { id } });
+  await db.fileChunk.deleteMany({ where: { fileId: id } });
+  await db.file.update({ where: { id }, data: { status: "deleted", textContent: "", storageKey: null } });
   return NextResponse.json({ ok: true });
-}
+});
