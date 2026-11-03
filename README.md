@@ -2,7 +2,7 @@
 
 > **Your goals in. Momentum out.**
 
-Backoff gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, and Interview Coach** — orchestrated inside a unified workspace for coursework, software projects, career growth, and daily execution.
+Backoff gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, and Interview Coach** — inside one workspace for coursework, software projects, career growth, and daily execution.
 
 Built on an autonomous **Agentic Architecture** with a deterministic state machine, permission-controlled tool registry, external integrations (including MCP support), asynchronous job processing, and human-in-the-loop safety approvals.
 
@@ -17,6 +17,18 @@ Built on an autonomous **Agentic Architecture** with a deterministic state machi
 - 🔌 **Integrations & MCP:** Encrypted credential vault (AES-256-GCM) supporting GitHub, Notion, Google Drive, and Model Context Protocol (MCP) servers.
 - ⚡ **Background Job Processing:** Robust async queue with exponential backoff, worker retry policies, and automated cleanup.
 - 📊 **Full Observability:** Structured JSON logging, distributed trace context, Sentry error monitoring, and runtime platform metrics.
+
+## ✅ Current product scope
+
+The current build includes the following student workspace flows:
+
+- **Workspace:** overview dashboard, agents, projects, tasks, progress, routines, approvals, career, settings, and usage.
+- **Knowledge workspace:** Markdown notes with autosave, course, project, and career-goal context, tags, search, daily notes, and Markdown export.
+- **Obsidian-style knowledge tools:** folders and tags, `[[wikilink]]` relationships, backlinks, a note graph, reusable templates, and revision history.
+- **AI study actions:** explain a note, quiz from study material, make a plan, summarize files, and generate flashcards.
+- **Safety:** approval-gated external actions, ownership checks on API routes, audit events, and encrypted integration credentials.
+
+The product is still in active development. Google OAuth and Google Classroom sync, production AI configuration, persistent file storage, billing, and production operations are not complete.
 
 ---
 
@@ -93,7 +105,7 @@ Agent executions follow a strict, deterministic state machine:
 - **Background Jobs:** Lightweight DB/Redis-backed polling queue with exponential backoff, worker retry limits, and dead-letter handling.
 - **Security & Encryption:** AES-256-GCM token encryption for third-party OAuth and integration credentials.
 - **Observability:** Structured JSON logger, distributed tracing (`x-trace-id`), Sentry error hooks, and real-time `/api/metrics`.
-- **Testing:** Vitest test runner (41 unit and integration tests passing).
+- **Testing:** Vitest test runner (90 tests passing across 15 test files at the time of this update).
 
 ---
 
@@ -106,8 +118,8 @@ Agent executions follow a strict, deterministic state machine:
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/Abhiman67/Backoff.git
-cd Backoff
+git clone https://github.com/Abhiman67/AgentHub.git
+cd AgentHub
 cp .env.example .env
 bun install
 ```
@@ -135,7 +147,9 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 3. **Safety Approval:** When an agent proposes a destructive action or external sync, inspect the pending approval card at `/app/approvals`. Review the payload diff and approve or deny.
 4. **Study & File RAG:** Upload `.pdf`, `.md`, or `.txt` notes in `/app/files`. Inspect document chunks and run study synthesis (flashcards and quizzes).
 5. **Project & Task Integration:** Check `/app/projects` and `/app/tasks`. Notice tasks created and linked by agents are scheduled with due dates and priority filters.
-6. **Integrations Vault:** Visit `/app/settings/integrations` to connect GitHub, Notion, Google Drive, or custom MCP servers with AES-256 encrypted credentials.
+6. **Knowledge graph:** Visit `/app/knowledge` to create notes, add context, tag them, and export Markdown. Use `/app/knowledge/graph` for backlinks and `/app/knowledge/folders` for folder and tag management.
+7. **Templates and history:** Use `/app/knowledge/templates` to start from a lecture, project, or daily-note template. Open `/app/knowledge/[noteId]/history` to inspect saved revisions.
+8. **Integrations Vault:** Visit `/app/settings/integrations` to connect GitHub, Notion, Google Drive, or custom MCP servers with AES-256 encrypted credentials.
 
 ---
 
@@ -146,7 +160,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 | **Dev** | `bun run dev` | Starts local Next.js dev server with hot reload |
 | **Build** | `bun run build` | Generates Prisma client and compiles production Next.js bundle |
 | **Start** | `bun run start` | Runs the compiled production build |
-| **Test** | `bun run test` | Runs the complete Vitest test suite (41 tests) |
+| **Test** | `bun run test` | Runs the complete Vitest test suite (90 tests) |
 | **Typecheck** | `bun run typecheck` | Validates TypeScript types across the entire project (`tsc --noEmit`) |
 | **Lint** | `bun run lint` | Runs ESLint 9 with Next.js rules |
 | **Format** | `bun run format` | Formats all code with Prettier |
@@ -174,6 +188,7 @@ Backoff/
 │   │   │   ├── projects/                    # Project scoping, milestones & activity
 │   │   │   ├── tasks/                       # Kanban / list task planner
 │   │   │   ├── files/                       # File manager & study RAG
+│   │   │   ├── knowledge/                   # Notes, folders, graph, templates & revisions
 │   │   │   ├── career/                      # Resume analysis & application tracker
 │   │   │   ├── approvals/                   # Human-in-the-loop review queue
 │   │   │   └── settings/                    # Profile, memory, integrations vault
@@ -182,6 +197,7 @@ Backoff/
 │   │       ├── tools/                       # Tool discovery & execution registry
 │   │       ├── integrations/                # Connected accounts & MCP proxy
 │   │       ├── files/                       # Uploads, chunking, and study generation
+│   │       ├── notes/                       # Notes, links, folders, tags & revisions
 │   │       ├── approvals/                   # Approval decision actions
 │   │       ├── metrics/                     # System health & performance metrics
 │   │       └── ...                          # Auth, projects, tasks, profile
@@ -220,6 +236,9 @@ Backoff/
 | `/api/approvals/[id]/[action]` | `POST` | Approve or deny a gated action (`approve` / `deny`) |
 | `/api/files` | `GET`, `POST` | Upload files and trigger automatic chunking |
 | `/api/files/[id]/study` | `POST` | Generate study flashcards and revision quizzes |
+| `/api/notes` | `GET`, `POST` | List and create Markdown notes with context, folders, tags, and wikilinks |
+| `/api/notes/[id]` | `GET`, `PATCH`, `PUT`, `DELETE` | Download, update, or soft-delete a note |
+| `/api/notes/[id]/revisions` | `GET` | List saved note revisions |
 | `/api/metrics` | `GET` | System health, active run counts, and performance metrics |
 
 ---
@@ -254,6 +273,35 @@ bun run typecheck
 ---
 
 ## 🐳 Production Deployment
+
+### Vercel
+
+The Next.js build is compatible with Vercel, but the local SQLite database is not suitable for a live deployment because serverless instances do not provide durable local storage. Use a hosted PostgreSQL database such as Vercel Postgres or Neon, then set the production environment variables in the Vercel project.
+
+```bash
+npx vercel login
+npx vercel
+npx prisma migrate deploy
+```
+
+Set at least these variables in Vercel:
+
+```bash
+DATABASE_URL="postgresql://..."
+AUTH_SECRET="use-a-long-random-secret"
+NEXTAUTH_URL="https://your-domain.vercel.app"
+ALLOW_MOCK_AI="true"
+```
+
+Set `ALLOW_MOCK_AI="false"` only after configuring a supported AI provider. Add Redis, email, storage, OAuth, and Stripe variables when those production features are enabled.
+
+The current deployment checklist is:
+
+- [ ] Connect Vercel and configure a hosted PostgreSQL database.
+- [ ] Apply Prisma migrations with `npx prisma migrate deploy`.
+- [ ] Configure `AUTH_SECRET` and the production URL.
+- [ ] Configure an AI provider and turn off mock AI.
+- [ ] Add persistent file storage, background workers, email, OAuth, Classroom sync, and billing before public launch.
 
 ### Docker Compose (Full Stack)
 Run Backoff alongside PostgreSQL 16 and Redis:
