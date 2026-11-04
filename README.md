@@ -2,6 +2,8 @@
 
 > **Your goals in. Momentum out.**
 
+Created and maintained by **Abhishek** ([Abhiman67](https://github.com/Abhiman67)).
+
 Backoff gives every student a personal team of specialized AI agents — **Study Coach, Project Guide, Career Scout, Writing Buddy, Code Mentor, and Interview Coach** — inside one workspace for coursework, software projects, career growth, and daily execution.
 
 Built on an autonomous **Agentic Architecture** with a deterministic state machine, permission-controlled tool registry, external integrations (including MCP support), asynchronous job processing, and human-in-the-loop safety approvals.
@@ -324,4 +326,6 @@ REDIS_URL="redis://redis:6379"
 
 ## 📄 License
 
-ISC License — see `package.json` for details.
+Copyright © 2026 Abhishek.
+
+This project is licensed under the ISC License. See [`package.json`](./package.json) for the license identifier.

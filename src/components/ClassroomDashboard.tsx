@@ -41,6 +41,7 @@ export function ClassroomDashboard({
         if (!cancelled) {
           setCourses(data.courses ?? []);
           setIsDemo(Boolean(data.demo));
+          void fetch("/api/integrations/classroom/sync", { method: "POST" });
         }
       })
       .catch(() => {
@@ -244,6 +245,7 @@ export function ClassroomDashboard({
               </div>
             </div>
             <div className="grok-classroom-header-actions">
+              <button type="button" className="grok-sync-btn" onClick={() => { setIsSyncing(true); void fetch("/api/integrations/classroom/sync", { method: "POST" }).finally(() => setIsSyncing(false)); }}>{isSyncing ? "Syncing…" : "Sync tasks"}</button>
               <Link href="/app/settings/integrations" className="grok-view-all">
                 Manage connection →
               </Link>

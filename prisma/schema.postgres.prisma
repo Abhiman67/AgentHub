@@ -150,10 +150,15 @@ model Task {
   milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
   createdAt   DateTime   @default(now())
   completedAt DateTime?
+  externalProvider String?
+  externalId String?
+  externalUrl String?
+  externalStatus String?
 
   @@index([projectId, status, dueDate])
   @@index([subjectId, status, dueDate])
   @@index([milestoneId])
+  @@unique([ownerId, externalProvider, externalId])
 }
 
 model File {

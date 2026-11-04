@@ -70,7 +70,7 @@ export default function Home() {
           <div className="hero-copy">
             <div className="eyebrow"><span className="pulse-dot" aria-hidden="true" />A personal AI team for students</div>
             <h1 data-split>Meet the team behind your <em>next big win.</em></h1>
-            <p className="lead">Study Coach, Project Guide, Career Scout and 3 more — bringing your notes, projects and deadlines into one calm workspace so the next useful step is easier to see. You approve before anything is sent.</p>
+            <p className="lead">Bring your notes, courses, projects and career goals into one connected workspace. Your AI team helps you study, build and move forward — with you in control.</p>
             <div className="actions">
               <Link className="button primary-orange" data-magnetic href="/signup">Create your workspace <span aria-hidden="true">↗</span></Link>
               <Link className="button secondary" href="/agents">Meet the agents</Link>

@@ -19,7 +19,7 @@
     "db:postgres": "docker compose up -d db redis && prisma migrate dev"
   },
   "keywords": [],
-  "author": "",
+  "author": "Abhishek (Abhiman67)",
   "license": "ISC",
   "dependencies": {
     "bullmq": "^6.3.9",

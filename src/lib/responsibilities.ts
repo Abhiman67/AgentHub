@@ -41,6 +41,13 @@ export async function tickResponsibilities(now = Date.now(), limit = 25): Promis
   const { notify } = await import("@/lib/notifications");
   const result: TickResult = { ran: 0, skipped: 0, errors: [] };
 
+  // Keep Classroom-backed tasks current whenever the scheduler ticks.
+  const { syncClassroomTasks } = await import("@/lib/integrations/classroom-sync");
+  const classroomAccounts = await db.integrationAccount.findMany({ where: { provider: "classroom" }, select: { ownerId: true } });
+  for (const account of classroomAccounts) {
+    try { await syncClassroomTasks(account.ownerId); } catch (err) { result.errors.push(err instanceof Error ? err.message : "Classroom sync failed"); }
+  }
+
   const due = await db.agentResponsibility.findMany({
     where: { status: "active", triggerType: "schedule", nextRunAt: { lte: new Date(now) } },
     orderBy: { nextRunAt: "asc" },

@@ -303,11 +303,11 @@ export default function FilesPage() {
                 <span className="tag">{f.status}</span>
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, paddingLeft: 46 }}>
+              <div className="file-actions">
                 <button
                   type="button"
                   onClick={() => togglePreview(f.id)}
-                  className="tag"
+                  className="file-action"
                   aria-pressed={openPreview === f.id}
                 >
                   {openPreview === f.id ? "Close preview" : "Preview"}
@@ -321,18 +321,18 @@ export default function FilesPage() {
                     key={a}
                     type="button"
                     onClick={() => toggleStudy(f.id, a)}
-                    className="tag"
+                    className={`file-action${activeAction === a ? " is-active" : ""}`}
                     aria-pressed={activeAction === a}
                   >
                     {l}
                   </button>
                 ))}
-                <Link href="/app/agents" className="tag" style={{ textDecoration: "none" }}>Ask</Link>
+                <Link href="/app/agents" className="file-action file-action-ask" style={{ textDecoration: "none" }}>Ask an agent</Link>
                 <button
                   type="button"
                   onClick={() => setFileToDelete(f)}
                   aria-label={`Delete ${f.name}`}
-                  className="link-danger"
+                  className="file-action file-action-danger"
                 >
                   Delete
                 </button>

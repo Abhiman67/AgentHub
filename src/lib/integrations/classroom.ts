@@ -151,22 +151,17 @@ export async function listClassroomCourses(accessToken: string): Promise<Classro
       return mockClassroomCourses();
     }
     const colors: ("purple" | "blue" | "teal" | "orange")[] = ["purple", "blue", "teal", "orange"];
-    return data.courses.slice(0, 4).map((c: { id: string; name: string; section?: string; ownerId?: string }, idx: number) => ({
-      id: c.id,
-      name: c.name,
-      section: c.section ?? `SEC-${idx + 1}`,
-      instructor: "Faculty Instructor",
-      colorScheme: colors[idx % colors.length],
-      assignments: [
-        {
-          id: `${c.id}-a1`,
-          title: "Coursework Item",
-          type: "assignment" as const,
-          dueText: "Due this week",
-          status: "pending" as const,
-        },
-      ],
+    const courses = await Promise.all(data.courses.slice(0, 8).map(async (c: { id: string; name: string; section?: string }, idx: number) => {
+      const workRes = await fetch(`https://classroom.googleapis.com/v1/courses/${c.id}/courseWork?courseWorkStates=ACTIVE&pageSize=100`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const workData = workRes.ok ? await workRes.json() : {};
+      const assignments = Array.isArray(workData.courseWork) ? workData.courseWork.map((w: { id: string; title: string; workType?: string; dueDate?: { year: number; month: number; day: number }; dueTime?: { hours?: number; minutes?: number }; alternateLink?: string; state?: string }) => {
+        const dueDate = w.dueDate ? new Date(Date.UTC(w.dueDate.year, w.dueDate.month - 1, w.dueDate.day, w.dueTime?.hours ?? 23, w.dueTime?.minutes ?? 59)) : undefined;
+        const status = w.state === "DELETED" ? "completed" : dueDate && dueDate.getTime() < Date.now() ? "overdue" : dueDate && dueDate.getTime() < Date.now() + 3 * 86400000 ? "due_soon" : "pending";
+        return { id: w.id, title: w.title, type: w.workType === "QUIZ" ? "quiz" : w.workType === "PROJECT" ? "project" : "assignment", dueDate: dueDate?.toISOString(), dueText: dueDate ? `Due ${dueDate.toLocaleDateString()}` : "No due date", status, link: w.alternateLink } as ClassroomItem;
+      }) : [];
+      return { id: c.id, name: c.name, section: c.section ?? `SEC-${idx + 1}`, instructor: "Faculty Instructor", colorScheme: colors[idx % colors.length], assignments };
     }));
+    return courses;
   } catch {
     return mockClassroomCourses();
   }
